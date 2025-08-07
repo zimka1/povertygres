@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+mod parser;
 mod storage;
 mod types;
 
@@ -23,13 +24,14 @@ fn main() {
             break;
         }
 
-        match parse_query(input) {
+        match parser::parse_query(input) {
             Ok(ast) => {
-                if let Err(err) = execute(&mut db, ast) {
-                    println!("Execution error: {err}");
-                }
+                // if let Err(err) = execute(&mut db, ast) {
+                //     println!("Execution error: {err}");
+                // }
+                println!("{:?}", ast);
             }
             Err(err) => println!("Parse error: {err}"),
         }
-    }    
+    }
 }
