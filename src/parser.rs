@@ -1,22 +1,24 @@
-use crate::storage::Column;
-use crate::types::Value;
+use crate::types::{Value, Column};
 use crate::types::{ColumnType, Query};
 
+// Parses a raw SQL-like input string into an AST representation (Query enum)
 pub fn parse_query(input: &str) -> Result<Query, String> {
+    // Normalize input (trim and lowercase)
     let input = input.trim().to_ascii_lowercase();
 
     if input.starts_with("create table ") {
         let prefix = "create table ";
         let after_prefix = &input[prefix.len()..];
 
+        // Find '(' to split table name and column definitions
         let paren_index = after_prefix
             .find('(')
             .ok_or("Missing '(' in create table")?;
 
         let table_name = after_prefix[..paren_index].trim();
 
+        // Extract column definitions between parentheses
         let inside_parens = after_prefix[paren_index + 1..].trim_end_matches(')').trim();
-
         let column_defs: Vec<&str> = inside_parens.split(',').collect();
 
         let mut columns = Vec::new();
@@ -27,6 +29,7 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
             let name = parts.next().ok_or("Missing column name")?;
             let type_str = parts.next().ok_or("Missing column type")?;
 
+            // Map string type to enum
             let column_type = match type_str.to_ascii_lowercase().as_str() {
                 "int" => ColumnType::Int,
                 "text" => ColumnType::Text,
@@ -44,6 +47,7 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
             name: table_name.to_string(),
             columns,
         });
+
     } else if input.starts_with("insert into") {
         let prefix = "insert into ";
 
@@ -51,6 +55,7 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
         let before_values = input[prefix.len()..values_index].trim();
         let after_values = input[values_index + "values".len()..].trim();
 
+        // Check for optional column list: insert into table(col1, col2) ...
         let (table_name, column_names): (&str, Option<Vec<&str>>) = if before_values.contains('(') {
             let open = before_values
                 .find('(')
@@ -68,11 +73,13 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
             (before_values, None)
         };
 
+        // Parse values from parentheses
         let open = after_values.find('(').ok_or("Missing '(' in values")?;
         let close = after_values.find(')').ok_or("Missing ')' in values")?;
         let values_str = &after_values[open + 1..close];
         let raw_values: Vec<&str> = values_str.split(',').map(|s| s.trim()).collect();
 
+        // Convert each raw string value to a Value enum
         let parsed_values: Result<Vec<Value>, String> = raw_values
             .into_iter()
             .map(|raw| {
@@ -102,6 +109,7 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
             column_names: column_names,
             values: values,
         });
+
     } else if input.starts_with("select") {
         let prefix = "select ";
 

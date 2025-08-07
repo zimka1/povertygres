@@ -1,18 +1,22 @@
-use crate::types::{ColumnType, Value};
+use crate::types::{ColumnType, Value, Column, Table, Row};
 use std::collections::{HashMap, HashSet};
 
 pub struct Database {
+    // Stores tables by their name
     pub tables: HashMap<String, Table>,
 }
 
 impl Database {
+    // Creates a new empty database
     pub fn new() -> Self {
         Self {
             tables: HashMap::new(),
         }
     }
 
+    // Adds a new table to the database
     pub fn create_table(&mut self, name: &str, columns: Vec<Column>) -> Result<(), String> {
+        // Check if table already exists
         if self.tables.contains_key(name) {
             return Err(format!("Table '{}' already exists", name));
         }
@@ -23,23 +27,28 @@ impl Database {
             rows: Vec::new(),
         };
 
+        // Insert table into database
         self.tables.insert(name.to_string(), table);
 
         Ok(())
     }
 
+    // Inserts a new row into a table
     pub fn insert_into(
         &mut self,
         table_name: &str,
-        column_names: Option<Vec<String>>,
-        values: Vec<Value>,
+        column_names: Option<Vec<String>>, // Optional: user can specify columns
+        values: Vec<Value>,                // Values to insert
     ) -> Result<(), String> {
+        // Get the target table
         let table = self
             .tables
             .get_mut(table_name)
             .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
     
+        // Reorder or validate values if column names are specified
         let final_values: Vec<Value> = if let Some(ref col_names) = column_names {
+            // Check if column count matches
             if col_names.len() != values.len() {
                 return Err(format!(
                     "Expected {} values for specified columns, but got {}",
@@ -47,7 +56,8 @@ impl Database {
                     values.len()
                 ));
             }
-    
+
+            // Check if all columns exist
             for name in col_names {
                 if !table.columns.iter().any(|c| c.name == *name) {
                     return Err(format!(
@@ -57,6 +67,7 @@ impl Database {
                 }
             }
 
+            // Fill row with Nulls, then replace values for matched columns
             let mut row = vec![Value::Null; table.columns.len()];
     
             for (col_name, value) in col_names.iter().zip(values.iter()) {
@@ -71,6 +82,7 @@ impl Database {
     
             row
         } else {
+            // No column names specified — use positionally
             if values.len() != table.columns.len() {
                 return Err(format!(
                     "Expected {} values, but got {}",
@@ -78,16 +90,17 @@ impl Database {
                     values.len()
                 ));
             }
-    
+
             values
         };
-    
+
+        // Type checking for each value against column type
         for (i, (value, column)) in final_values.iter().zip(&table.columns).enumerate() {
             let compatible = match (value, &column.column_type) {
                 (Value::Int(_), ColumnType::Int) => true,
                 (Value::Text(_), ColumnType::Text) => true,
                 (Value::Bool(_), ColumnType::Bool) => true,
-                (Value::Null, _) => true,
+                (Value::Null, _) => true, // NULL allowed in any column
                 _ => false,
             };
     
@@ -98,13 +111,15 @@ impl Database {
                 ));
             }
         }
-    
+
+        // Insert row into the table
         table.rows.push(Row { values: final_values });
         Ok(())
     }
-    
 
+    // Selects rows from a table with specified column names
     pub fn select(&self, table_name: &str, column_names: Vec<String>) -> Result<Vec<Row>, String> {
+        // Get the table
         let table = self
             .tables
             .get(table_name)
@@ -112,12 +127,14 @@ impl Database {
 
         let column_name_set: HashSet<_> = column_names.iter().collect();
 
+        // Special case: SELECT *
         if let Some(first) = column_names.get(0) {
             if first == "*" {
                 return Ok(table.rows.clone());
             }
         }
-    
+
+        // Check if all selected columns exist
         for name in &column_names {
             if !table.columns.iter().any(|c| c.name == *name) {
                 return Err(format!(
@@ -127,22 +144,23 @@ impl Database {
             }
         }
 
+        // Get indexes of requested columns
         let mut needed_value_indexes = Vec::new();
-
         for (i, column) in table.columns.iter().enumerate() {
             if column_name_set.contains(&column.name) {
                 needed_value_indexes.push(i);
             }
         }
 
+        // Build new rows with only selected columns
         let rows: Vec<Row> = table.rows.iter().map(|row| {
             let filtered_values = row
-            .values
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| needed_value_indexes.contains(i))
-            .map(|(_, v)| v.clone())
-            .collect();
+                .values
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| needed_value_indexes.contains(i))
+                .map(|(_, v)| v.clone())
+                .collect();
 
             Row { values: filtered_values }
         }).collect();
@@ -151,31 +169,14 @@ impl Database {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Table {
-    pub name: String,
-    pub columns: Vec<Column>,
-    pub rows: Vec<Row>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Column {
-    pub name: String,
-    pub column_type: ColumnType,
-}
-
-#[derive(Debug, Clone)]
-pub struct Row {
-    pub values: Vec<Value>,
-}
-
-
 pub fn print_table(columns: &[Column], rows: &[Row]) {
+    // Step 1: Determine column widths based on header names
     let mut widths: Vec<usize> = columns
         .iter()
         .map(|col| col.name.len())
         .collect();
 
+    // Step 2: Adjust widths to fit the widest value in each column
     for row in rows {
         for (i, value) in row.values.iter().enumerate() {
             let s = match value {
@@ -190,16 +191,17 @@ pub fn print_table(columns: &[Column], rows: &[Row]) {
         }
     }
 
+    // Step 3: Build the horizontal separator line based on column widths
     let sep_line = widths
         .iter()
         .map(|w| format!("+{}+", "-".repeat(*w + 2)))
         .collect::<Vec<_>>()
         .join("")
-        .replace("++", "+"); // чтобы не было двойных плюсов
+        .replace("++", "+"); // Remove duplicate plus signs
     let sep_line = format!("+{}+", sep_line.trim_matches('+'));
 
+    // Step 4: Print header
     println!("{}", sep_line);
-
     let header = columns
         .iter()
         .zip(&widths)
@@ -208,6 +210,7 @@ pub fn print_table(columns: &[Column], rows: &[Row]) {
     println!("{}", header);
     println!("{}", sep_line);
 
+    // Step 5: Print each row
     for row in rows {
         let line = row
             .values
@@ -226,5 +229,6 @@ pub fn print_table(columns: &[Column], rows: &[Row]) {
         println!("{}", line);
     }
 
+    // Step 6: Print bottom border
     println!("{}", sep_line);
 }
