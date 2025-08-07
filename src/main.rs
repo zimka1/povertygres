@@ -2,6 +2,7 @@ use std::io::{self, Write};
 mod parser;
 mod storage;
 mod types;
+mod executer;
 
 use crate::storage::Database;
 
@@ -26,10 +27,9 @@ fn main() {
 
         match parser::parse_query(input) {
             Ok(ast) => {
-                // if let Err(err) = execute(&mut db, ast) {
-                //     println!("Execution error: {err}");
-                // }
-                println!("{:?}", ast);
+                if let Err(err) = executer::execute(&mut db, ast) {
+                    println!("Execution error: {err}");
+                }
             }
             Err(err) => println!("Parse error: {err}"),
         }
