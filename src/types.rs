@@ -1,17 +1,5 @@
 use std::fmt;
 
-// Display implementation for pretty-printing values
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Value::Int(i) => write!(f, "{}", i),
-            Value::Text(s) => write!(f, "{}", s),
-            Value::Bool(b) => write!(f, "{}", b),
-            Value::Null => write!(f, "NULL"),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Table {
     // Table name
@@ -43,6 +31,18 @@ pub enum Value {
     Text(String),
     Bool(bool),
     Null, // Equivalent to SQL NULL
+}
+
+// Display implementation for pretty-printing values
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::Int(i) => write!(f, "{}", i),
+            Value::Text(s) => write!(f, "{}", s),
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::Null => write!(f, "NULL"),
+        }
+    }
 }
 
 // Supported data types for columns

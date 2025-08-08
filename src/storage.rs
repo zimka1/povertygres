@@ -1,4 +1,4 @@
-use crate::types::{ColumnType, Value, Column, Table, Row};
+use crate::types::{Column, ColumnType, Row, Table, Value};
 use std::collections::{HashMap, HashSet};
 
 pub struct Database {
@@ -45,7 +45,7 @@ impl Database {
             .tables
             .get_mut(table_name)
             .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
-    
+
         // Reorder or validate values if column names are specified
         let final_values: Vec<Value> = if let Some(ref col_names) = column_names {
             // Check if column count matches
@@ -69,7 +69,7 @@ impl Database {
 
             // Fill row with Nulls, then replace values for matched columns
             let mut row = vec![Value::Null; table.columns.len()];
-    
+
             for (col_name, value) in col_names.iter().zip(values.iter()) {
                 let Some(index) = table.columns.iter().position(|c| c.name == *col_name) else {
                     return Err(format!(
@@ -79,7 +79,7 @@ impl Database {
                 };
                 row[index] = value.clone();
             }
-    
+
             row
         } else {
             // No column names specified — use positionally
@@ -103,17 +103,16 @@ impl Database {
                 (Value::Null, _) => true, // NULL allowed in any column
                 _ => false,
             };
-    
+
             if !compatible {
-                return Err(format!(
-                    "Type mismatch at column {} ('{}')",
-                    i, column.name
-                ));
+                return Err(format!("Type mismatch at column {} ('{}')", i, column.name));
             }
         }
 
         // Insert row into the table
-        table.rows.push(Row { values: final_values });
+        table.rows.push(Row {
+            values: final_values,
+        });
         Ok(())
     }
 
@@ -153,82 +152,24 @@ impl Database {
         }
 
         // Build new rows with only selected columns
-        let rows: Vec<Row> = table.rows.iter().map(|row| {
-            let filtered_values = row
-                .values
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| needed_value_indexes.contains(i))
-                .map(|(_, v)| v.clone())
-                .collect();
+        let rows: Vec<Row> = table
+            .rows
+            .iter()
+            .map(|row| {
+                let filtered_values = row
+                    .values
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| needed_value_indexes.contains(i))
+                    .map(|(_, v)| v.clone())
+                    .collect();
 
-            Row { values: filtered_values }
-        }).collect();
+                Row {
+                    values: filtered_values,
+                }
+            })
+            .collect();
 
         Ok(rows)
     }
-}
-
-pub fn print_table(columns: &[Column], rows: &[Row]) {
-    // Step 1: Determine column widths based on header names
-    let mut widths: Vec<usize> = columns
-        .iter()
-        .map(|col| col.name.len())
-        .collect();
-
-    // Step 2: Adjust widths to fit the widest value in each column
-    for row in rows {
-        for (i, value) in row.values.iter().enumerate() {
-            let s = match value {
-                Value::Int(v) => v.to_string(),
-                Value::Text(s) => s.clone(),
-                Value::Bool(b) => b.to_string(),
-                Value::Null => "NULL".to_string(),
-            };
-            if s.len() > widths[i] {
-                widths[i] = s.len();
-            }
-        }
-    }
-
-    // Step 3: Build the horizontal separator line based on column widths
-    let sep_line = widths
-        .iter()
-        .map(|w| format!("+{}+", "-".repeat(*w + 2)))
-        .collect::<Vec<_>>()
-        .join("")
-        .replace("++", "+"); // Remove duplicate plus signs
-    let sep_line = format!("+{}+", sep_line.trim_matches('+'));
-
-    // Step 4: Print header
-    println!("{}", sep_line);
-    let header = columns
-        .iter()
-        .zip(&widths)
-        .map(|(col, w)| format!("| {:width$} ", col.name, width = *w))
-        .collect::<String>() + "|";
-    println!("{}", header);
-    println!("{}", sep_line);
-
-    // Step 5: Print each row
-    for row in rows {
-        let line = row
-            .values
-            .iter()
-            .zip(&widths)
-            .map(|(val, w)| {
-                let s = match val {
-                    Value::Int(v) => v.to_string(),
-                    Value::Text(s) => s.clone(),
-                    Value::Bool(b) => b.to_string(),
-                    Value::Null => "NULL".to_string(),
-                };
-                format!("| {:width$} ", s, width = *w)
-            })
-            .collect::<String>() + "|";
-        println!("{}", line);
-    }
-
-    // Step 6: Print bottom border
-    println!("{}", sep_line);
 }
