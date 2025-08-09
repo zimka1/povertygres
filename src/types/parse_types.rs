@@ -7,17 +7,20 @@ pub enum Query {
     CreateTable {
         name: String,
         columns: Vec<Column>,
+        filter: Option<Condition>
     },
     /// INSERT INTO table (col1, col2) VALUES (...)
     Insert {
         table: String,
         column_names: Option<Vec<String>>, // Optional list of target columns; None means "all columns"
         values: Vec<Value>,                 // Values to insert (order matches columns)
+        filter: Option<Condition>
     },
     /// SELECT col1, col2 FROM table
     Select {
         table: String,
         column_names: Vec<String>, // "*" is represented as ["*"]
+        filter: Option<Condition>
     },
 }
 

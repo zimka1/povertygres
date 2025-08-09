@@ -18,6 +18,14 @@ pub struct Column {
     pub column_type: ColumnType,
 }
 
+// Supported data types for columns
+#[derive(Debug, Clone, PartialEq)]
+pub enum ColumnType {
+    Int,
+    Text,
+    Bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct Row {
     // Ordered list of values (same order as columns)
@@ -43,12 +51,4 @@ impl fmt::Display for Value {
             Value::Null => write!(f, "NULL"),
         }
     }
-}
-
-// Supported data types for columns
-#[derive(Debug, Clone, PartialEq)]
-pub enum ColumnType {
-    Int,
-    Text,
-    Bool,
 }

@@ -18,11 +18,11 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
     }
 
     if input.to_ascii_lowercase().starts_with("create table ") {
-        parse_create_table(input)
+        parse_create_table(input, condition)
     } else if input.to_ascii_lowercase().starts_with("insert into") {
-        parse_insert(input)
+        parse_insert(input, condition)
     } else if input.to_ascii_lowercase().starts_with("select ") {
-        parse_select(input)
+        parse_select(input, condition)
     } else {
         Err("Unrecognized command".to_string())
     }

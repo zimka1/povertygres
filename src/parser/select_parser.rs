@@ -1,6 +1,6 @@
-use crate::types::parse_types::{Query};
+use crate::types::parse_types::{Condition, Query};
 
-pub fn parse_select(input: &str) -> Result<Query, String> {
+pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, String> {
     let prefix = "select ";
 
     let from_index = input.find("from").ok_or("Missing 'from'")?;
@@ -17,5 +17,6 @@ pub fn parse_select(input: &str) -> Result<Query, String> {
     return Ok(Query::Select {
         table: table_name.to_string(),
         column_names,
+        filter
     });
 }

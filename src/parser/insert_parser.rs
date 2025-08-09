@@ -1,7 +1,7 @@
-use crate::types::parse_types::{Query};
+use crate::types::parse_types::{Condition, Query};
 use crate::types::storage_types::{Value};
 
-pub fn parse_insert(input: &str) -> Result<Query, String> {
+pub fn parse_insert(input: &str, filter: Option<Condition>) -> Result<Query, String> {
     let prefix = "insert into ";
 
     let values_index = input.find("values").ok_or("Missing 'values'")?;
@@ -60,5 +60,6 @@ pub fn parse_insert(input: &str) -> Result<Query, String> {
         table: table_name.to_string(),
         column_names: column_names,
         values: values,
+        filter
     });
 }

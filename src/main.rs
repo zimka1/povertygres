@@ -4,6 +4,7 @@ mod parser;
 mod printer;
 mod storage;
 mod types;
+mod errors;
 
 use crate::storage::Database;
 use crate::parser::main_parser::parse_query;
