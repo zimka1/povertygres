@@ -1,38 +1,7 @@
-use crate::types::storage_types::{Column, ColumnType, Row, Table, Value};
-use std::collections::{HashMap, HashSet};
-
-pub struct Database {
-    // Stores tables by their name
-    pub tables: HashMap<String, Table>,
-}
+use crate::types::{storage_types::{ColumnType, Row, Value}};
+use crate::types::storage_types::Database;
 
 impl Database {
-    // Creates a new empty database
-    pub fn new() -> Self {
-        Self {
-            tables: HashMap::new(),
-        }
-    }
-
-    // Adds a new table to the database
-    pub fn create_table(&mut self, name: &str, columns: Vec<Column>) -> Result<(), String> {
-        // Check if table already exists
-        if self.tables.contains_key(name) {
-            return Err(format!("Table '{}' already exists", name));
-        }
-
-        let table = Table {
-            name: name.to_string(),
-            columns,
-            rows: Vec::new(),
-        };
-
-        // Insert table into database
-        self.tables.insert(name.to_string(), table);
-
-        Ok(())
-    }
-
     // Inserts a new row into a table
     pub fn insert_into(
         &mut self,
@@ -114,62 +83,5 @@ impl Database {
             values: final_values,
         });
         Ok(())
-    }
-
-    // Selects rows from a table with specified column names
-    pub fn select(&self, table_name: &str, column_names: Vec<String>) -> Result<Vec<Row>, String> {
-        // Get the table
-        let table = self
-            .tables
-            .get(table_name)
-            .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
-
-        let column_name_set: HashSet<_> = column_names.iter().collect();
-
-        // Special case: SELECT *
-        if let Some(first) = column_names.get(0) {
-            if first == "*" {
-                return Ok(table.rows.clone());
-            }
-        }
-
-        // Check if all selected columns exist
-        for name in &column_names {
-            if !table.columns.iter().any(|c| c.name == *name) {
-                return Err(format!(
-                    "There is no '{}' column in table '{}'",
-                    name, table_name
-                ));
-            }
-        }
-
-        // Get indexes of requested columns
-        let mut needed_value_indexes = Vec::new();
-        for (i, column) in table.columns.iter().enumerate() {
-            if column_name_set.contains(&column.name) {
-                needed_value_indexes.push(i);
-            }
-        }
-
-        // Build new rows with only selected columns
-        let rows: Vec<Row> = table
-            .rows
-            .iter()
-            .map(|row| {
-                let filtered_values = row
-                    .values
-                    .iter()
-                    .enumerate()
-                    .filter(|(i, _)| needed_value_indexes.contains(i))
-                    .map(|(_, v)| v.clone())
-                    .collect();
-
-                Row {
-                    values: filtered_values,
-                }
-            })
-            .collect();
-
-        Ok(rows)
     }
 }

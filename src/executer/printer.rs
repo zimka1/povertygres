@@ -1,8 +1,8 @@
 use crate::types::storage_types::{Column, Row, Value};
 
-pub fn print_table(columns: &[Column], rows: &[Row]) {
+pub fn print_table(columns: &Vec<String>, rows: &[Row]) {
     // Step 1: Determine column widths based on header names
-    let mut widths: Vec<usize> = columns.iter().map(|col| col.name.len()).collect();
+    let mut widths: Vec<usize> = columns.iter().map(|col| col.len()).collect();
 
     // Step 2: Adjust widths to fit the widest value in each column
     for row in rows {
@@ -33,7 +33,7 @@ pub fn print_table(columns: &[Column], rows: &[Row]) {
     let header = columns
         .iter()
         .zip(&widths)
-        .map(|(col, w)| format!("| {:width$} ", col.name, width = *w))
+        .map(|(col, w)| format!("| {:width$} ", col, width = *w))
         .collect::<String>()
         + "|";
     println!("{}", header);

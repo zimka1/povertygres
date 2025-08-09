@@ -1,4 +1,19 @@
 use std::fmt;
+use std::collections::{HashMap};
+
+pub struct Database {
+    // Stores tables by their name
+    pub tables: HashMap<String, Table>,
+}
+
+impl Database {
+    // Creates a new empty database
+    pub fn new() -> Self {
+        Self {
+            tables: HashMap::new(),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Table {
@@ -49,6 +64,33 @@ impl fmt::Display for Value {
             Value::Text(s) => write!(f, "{}", s),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Null => write!(f, "NULL"),
+        }
+    }
+}
+
+/// Enumerates the possible data types for values in the database.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValueType { Int, Text, Bool, Null }
+
+impl fmt::Display for ValueType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            ValueType::Int  => "INT",
+            ValueType::Text => "TEXT",
+            ValueType::Bool => "BOOL",
+            ValueType::Null => "NULL",
+        })
+    }
+}
+
+impl Value {
+    /// Returns the `ValueType` corresponding to this `Value` variant.
+    pub fn vtype(&self) -> ValueType {
+        match self {
+            Value::Int(_)  => ValueType::Int,
+            Value::Text(_) => ValueType::Text,
+            Value::Bool(_) => ValueType::Bool,
+            Value::Null    => ValueType::Null,
         }
     }
 }

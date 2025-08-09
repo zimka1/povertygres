@@ -1,13 +1,12 @@
 use std::io::{self, Write};
 mod executer;
 mod parser;
-mod printer;
-mod storage;
 mod types;
 mod errors;
 
-use crate::storage::Database;
+use crate::types::storage_types::Database;
 use crate::parser::main_parser::parse_query;
+use crate::executer::executer::execute;
 
 fn main() {
     // Initialize an empty in-memory database
@@ -37,7 +36,7 @@ fn main() {
         match parse_query(input) {
             Ok(ast) => {
                 // Execute AST on the database
-                if let Err(err) = executer::execute(&mut db, ast) {
+                if let Err(err) = execute(&mut db, ast) {
                     println!("Execution error: {err}");
                 }
             }

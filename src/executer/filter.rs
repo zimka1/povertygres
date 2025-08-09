@@ -1,65 +1,8 @@
-use crate::printer::print_table;
-use crate::storage::Database;
-use crate::types::parse_types::{Condition, Query};
+use crate::types::parse_types::{Condition};
 use crate::types::storage_types::{Column, Row, Value};
-use crate::errors::eval_error::{EvalError, CmpOp, EvalResult, ValueType};
-
-// Executes a parsed query (AST) against the database
-pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
-    let _ = match ast {
-        // CREATE TABLE name (...) -> create a new table
-        Query::CreateTable { name, columns, filter } => db.create_table(&name, columns)?,
-
-        // INSERT INTO table (...) VALUES (...) -> insert a new row
-        Query::Insert {
-            table,
-            column_names,
-            values,
-            filter
-        } => db.insert_into(&table, column_names, values)?,
-
-        // SELECT ... FROM table -> fetch and print matching rows
-        Query::Select {
-            table,
-            column_names,
-            filter
-        } => {
-            println!("Step 1");
-            // Step 1: Retrieve rows from the table (projection of requested columns)
-            let rows = db.select(&table, column_names)?;
-
-            println!("Step 2");
-            // Step 2: Get a reference to the full table (to access column metadata)
-            let table_ref = db.tables.get(&table).expect("table not found");
-
-            println!("Step 3");
-            // Step 3: Apply WHERE filter if present
-            let rows: Vec<Row> = match &filter {
-                Some(cond) => {
-                    let mut out = Vec::with_capacity(rows.len());
-                    for row in rows {
-                        println!("{:?}", row);
-                        // Evaluate the condition for this row
-                        // Convert EvalError to String to match this function's return type
-                        if eval_condition(cond, &row, &table_ref.columns)
-                            .map_err(|e| e.to_string())?
-                        {
-                            out.push(row);
-                        }
-                    }
-                    out
-                },
-                None => rows,
-            };
-
-            println!("Step 4");
-            // Step 4: Print results in a formatted table
-            print_table(&table_ref.columns, &rows);
-        }
-    };
-
-    Ok(())
-}
+use crate::errors::eval_error::{EvalError, EvalResult};
+use crate::types::storage_types::ValueType;
+use crate::types::filter_types::CmpOp;
 
 /// Compares two values in strict mode
 pub fn cmp_values(op: CmpOp, left: &Value, right: &Value) -> EvalResult<bool> {
