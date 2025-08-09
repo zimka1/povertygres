@@ -6,6 +6,7 @@ mod storage;
 mod types;
 
 use crate::storage::Database;
+use crate::parser::main_parser::parse_query;
 
 fn main() {
     // Initialize an empty in-memory database
@@ -32,7 +33,7 @@ fn main() {
         }
 
         // Parse query into AST
-        match parser::parse_query(input) {
+        match parse_query(input) {
             Ok(ast) => {
                 // Execute AST on the database
                 if let Err(err) = executer::execute(&mut db, ast) {

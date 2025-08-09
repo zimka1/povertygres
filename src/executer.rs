@@ -1,6 +1,6 @@
 use crate::printer::print_table;
 use crate::storage::Database;
-use crate::types::Query;
+use crate::types::parse_types::Query;
 
 // Executes a parsed query (AST) against the database
 pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {

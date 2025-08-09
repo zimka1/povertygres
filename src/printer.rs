@@ -1,4 +1,4 @@
-use crate::types::{Column, Row, Value};
+use crate::types::storage_types::{Column, Row, Value};
 
 pub fn print_table(columns: &[Column], rows: &[Row]) {
     // Step 1: Determine column widths based on header names

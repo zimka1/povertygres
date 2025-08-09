@@ -1,4 +1,4 @@
-use crate::types::{Column, ColumnType, Row, Table, Value};
+use crate::types::storage_types::{Column, ColumnType, Row, Table, Value};
 use std::collections::{HashMap, HashSet};
 
 pub struct Database {

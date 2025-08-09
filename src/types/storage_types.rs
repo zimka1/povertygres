@@ -52,24 +52,3 @@ pub enum ColumnType {
     Text,
     Bool,
 }
-
-// Abstract Syntax Tree (AST) for parsed SQL-like queries
-#[derive(Debug)]
-pub enum Query {
-    // CREATE TABLE table_name (col1 type1, col2 type2, ...)
-    CreateTable {
-        name: String,
-        columns: Vec<Column>,
-    },
-    // INSERT INTO table (col1, col2) VALUES (...)
-    Insert {
-        table: String,
-        column_names: Option<Vec<String>>, // Optional list of target columns
-        values: Vec<Value>,                // Values to insert
-    },
-    // SELECT col1, col2 FROM table
-    Select {
-        table: String,
-        column_names: Vec<String>, // '*' is represented as ["*"]
-    },
-}
