@@ -9,18 +9,21 @@ Goal: implement core PostgreSQL architecture and algorithms.
 
 - [x] In-memory table storage
 - [x] `CREATE TABLE` support
-- [x] `INSERT INTO` with/without column list
-- [x] `SELECT` with specific columns
+- [x] `INSERT INTO` with/without column list (auto-fill missing columns with `NULL`)
+- [x] `SELECT` with specific columns and `SELECT *`
 - [x] `Value` types: `INT`, `TEXT`, `BOOL`, `NULL`
 - [x] Pretty table output
-
+- [x] Basic `WHERE` clause support
+  - [x] Comparison operators: `=`, `!=`, `<`, `<=`, `>`, `>=`
+  - [x] Logical operators: `AND`, `OR`, `NOT` (with short-circuit evaluation)
+  - [x] Strict type checking (no implicit casts)
+  - [x] Error handling for unknown columns, type mismatch, invalid operations
 ---
 
 ## Planned architecture
 
 ### Parsing (SQL → AST)
-- [x] Parser for `CREATE TABLE`, `INSERT`, `SELECT`
-- [ ] Extend parser with `UPDATE`, `DELETE`, `WHERE`, `JOIN`
+- [ ] Extend parser with `UPDATE`, `DELETE`, `JOIN`
 
 ### Planner (AST → Logical Plan)
 - [ ] Define `LogicalPlan` (projection, selection, scan)
