@@ -24,7 +24,7 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
     }
 
     if input.to_ascii_lowercase().starts_with("create table ") {
-        parse_create_table(input, condition)
+        parse_create_table(input)
     } else if input.to_ascii_lowercase().starts_with("insert into") {
         parse_insert(input)
     } else if input.to_ascii_lowercase().starts_with("select ") {

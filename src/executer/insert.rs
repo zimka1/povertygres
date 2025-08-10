@@ -1,4 +1,3 @@
-use crate::types::parser_types::Condition;
 use crate::types::storage_types::Database;
 use crate::types::storage_types::{ColumnType, Row, Value};
 

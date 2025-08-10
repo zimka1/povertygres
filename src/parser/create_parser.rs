@@ -1,7 +1,7 @@
-use crate::types::parser_types::{Condition, Query};
+use crate::types::parser_types::Query;
 use crate::types::storage_types::{Column, ColumnType};
 
-pub fn parse_create_table(input: &str, filter: Option<Condition>) -> Result<Query, String> {
+pub fn parse_create_table(input: &str) -> Result<Query, String> {
     let prefix = "create table ";
     let after_prefix = &input[prefix.len()..];
 

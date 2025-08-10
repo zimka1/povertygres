@@ -1,4 +1,4 @@
-use crate::types::parser_types::{Condition, Query};
+use crate::types::parser_types::Query;
 use crate::types::storage_types::Value;
 
 pub fn parse_insert(input: &str) -> Result<Query, String> {

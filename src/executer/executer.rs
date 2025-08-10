@@ -30,7 +30,9 @@ pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
             // Step 2: Print results in a formatted table
             print_table(&column_names, &rows);
         }
-        Query::Delete { table_name, filter } => println!("DELETE {:?}", db.delete(&table_name, filter).unwrap())
+        Query::Delete { table_name, filter } => {
+            println!("DELETE {:?}", db.delete(&table_name, filter).unwrap())
+        }
     };
 
     Ok(())

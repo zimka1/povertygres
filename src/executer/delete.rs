@@ -1,14 +1,10 @@
-use crate::types::storage_types::Database;
-use crate::types::{parser_types::Condition};
 use crate::executer::filter::eval_condition;
+use crate::types::parser_types::Condition;
+use crate::types::storage_types::Database;
 
 impl Database {
     // Selects rows from a table with specified column names
-    pub fn delete(
-        &mut self,
-        table_name: &str,
-        filter: Option<Condition>,
-    ) -> Result<usize, String> {
+    pub fn delete(&mut self, table_name: &str, filter: Option<Condition>) -> Result<usize, String> {
         // Get the table
         let table = self
             .tables
@@ -24,7 +20,8 @@ impl Database {
         let deleted = table.rows.len();
 
         if let Some(cond) = &filter {
-            table.rows = table.rows
+            table.rows = table
+                .rows
                 .iter()
                 .map(|row| {
                     eval_condition(cond, row, &table.columns)
@@ -37,7 +34,7 @@ impl Database {
                 .map(|(_, row)| row)
                 .collect();
         }
-        
+
         Ok(deleted - table.rows.len())
     }
 }
