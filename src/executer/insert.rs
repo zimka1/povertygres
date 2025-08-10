@@ -1,5 +1,6 @@
-use crate::types::{storage_types::{ColumnType, Row, Value}};
+use crate::types::parser_types::Condition;
 use crate::types::storage_types::Database;
+use crate::types::storage_types::{ColumnType, Row, Value};
 
 impl Database {
     // Inserts a new row into a table

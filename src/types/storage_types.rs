@@ -1,5 +1,5 @@
+use std::collections::HashMap;
 use std::fmt;
-use std::collections::{HashMap};
 
 pub struct Database {
     // Stores tables by their name
@@ -70,12 +70,17 @@ impl fmt::Display for Value {
 
 /// Enumerates the possible data types for values in the database.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ValueType { Int, Text, Bool, Null }
+pub enum ValueType {
+    Int,
+    Text,
+    Bool,
+    Null,
+}
 
 impl fmt::Display for ValueType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            ValueType::Int  => "INT",
+            ValueType::Int => "INT",
             ValueType::Text => "TEXT",
             ValueType::Bool => "BOOL",
             ValueType::Null => "NULL",
@@ -87,10 +92,10 @@ impl Value {
     /// Returns the `ValueType` corresponding to this `Value` variant.
     pub fn vtype(&self) -> ValueType {
         match self {
-            Value::Int(_)  => ValueType::Int,
+            Value::Int(_) => ValueType::Int,
             Value::Text(_) => ValueType::Text,
             Value::Bool(_) => ValueType::Bool,
-            Value::Null    => ValueType::Null,
+            Value::Null => ValueType::Null,
         }
     }
 }

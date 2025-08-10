@@ -1,4 +1,4 @@
-use crate::types::parse_types::{Condition, Query};
+use crate::types::parser_types::{Condition, Query};
 
 pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, String> {
     let prefix = "select ";
@@ -15,8 +15,8 @@ pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, Str
         .collect();
 
     return Ok(Query::Select {
-        table: table_name.to_string(),
+        table_name: table_name.to_string(),
         column_names,
-        filter
+        filter,
     });
 }

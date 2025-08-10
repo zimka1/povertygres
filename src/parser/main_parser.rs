@@ -1,5 +1,11 @@
-use crate::types::parse_types::{Condition, Query};
-use super::{select_parser::parse_select, create_parser::parse_create_table, insert_parser::parse_insert, where_parser::parse_where};
+use super::{
+    create_parser::parse_create_table, insert_parser::parse_insert, select_parser::parse_select,
+    where_parser::parse_where,
+};
+use crate::{
+    parser::delete_parser::parse_delete,
+    types::parser_types::{Condition, Query},
+};
 
 // Parses a raw SQL-like input string into an AST representation (Query enum)
 pub fn parse_query(input: &str) -> Result<Query, String> {
@@ -20,9 +26,11 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
     if input.to_ascii_lowercase().starts_with("create table ") {
         parse_create_table(input, condition)
     } else if input.to_ascii_lowercase().starts_with("insert into") {
-        parse_insert(input, condition)
+        parse_insert(input)
     } else if input.to_ascii_lowercase().starts_with("select ") {
         parse_select(input, condition)
+    } else if input.to_ascii_lowercase().starts_with("delete ") {
+        parse_delete(input, condition)
     } else {
         Err("Unrecognized command".to_string())
     }

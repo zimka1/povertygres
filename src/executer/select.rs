@@ -1,11 +1,16 @@
-use crate::types::storage_types::Database;
-use std::collections::{HashSet};
 use crate::executer::filter::eval_condition;
-use crate::types::{parse_types::Condition, storage_types::Row};
+use crate::types::storage_types::Database;
+use crate::types::{parser_types::Condition, storage_types::Row};
+use std::collections::HashSet;
 
 impl Database {
     // Selects rows from a table with specified column names
-    pub fn select(&self, table_name: &str, column_names: &Vec<String>, filter: Option<Condition>) -> Result<Vec<Row>, String> {
+    pub fn select(
+        &self,
+        table_name: &str,
+        column_names: &Vec<String>,
+        filter: Option<Condition>,
+    ) -> Result<Vec<Row>, String> {
         // Get the table
         let table = self
             .tables
@@ -46,8 +51,7 @@ impl Database {
         for row in &table.rows {
             // If filter exists, check condition
             if let Some(cond) = &filter {
-                let keep = eval_condition(cond, row, &table.columns)
-                    .map_err(|e| e.to_string())?;
+                let keep = eval_condition(cond, row, &table.columns).map_err(|e| e.to_string())?;
                 if !keep {
                     continue; // skip this row
                 }
@@ -62,7 +66,9 @@ impl Database {
                 .map(|(_, v)| v.clone())
                 .collect();
 
-            result.push(Row { values: filtered_values });
+            result.push(Row {
+                values: filtered_values,
+            });
         }
 
         Ok(result)

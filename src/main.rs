@@ -1,12 +1,12 @@
 use std::io::{self, Write};
+mod errors;
 mod executer;
 mod parser;
 mod types;
-mod errors;
 
-use crate::types::storage_types::Database;
-use crate::parser::main_parser::parse_query;
 use crate::executer::executer::execute;
+use crate::parser::main_parser::parse_query;
+use crate::types::storage_types::Database;
 
 fn main() {
     // Initialize an empty in-memory database

@@ -1,5 +1,5 @@
 use crate::types::storage_types::Database;
-use crate::types::{storage_types::{Column, Table}};
+use crate::types::storage_types::{Column, Table};
 
 impl Database {
     // Adds a new table to the database
