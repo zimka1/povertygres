@@ -57,8 +57,6 @@ pub fn print_table(columns: &Vec<String>, rows: &[Row]) {
             .collect::<String>()
             + "|";
         println!("{}", line);
+        println!("{}", sep_line);
     }
-
-    // Step 6: Print bottom border
-    println!("{}", sep_line);
 }

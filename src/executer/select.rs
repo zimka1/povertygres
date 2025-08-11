@@ -1,7 +1,6 @@
 use crate::executer::filter::eval_condition;
 use crate::types::storage_types::Database;
 use crate::types::{parser_types::Condition, storage_types::Row};
-use std::collections::HashSet;
 
 impl Database {
     // Selects rows from a table with specified column names
@@ -11,66 +10,55 @@ impl Database {
         column_names: &Vec<String>,
         filter: Option<Condition>,
     ) -> Result<Vec<Row>, String> {
-        // Get the table
+        // Look up the table by name
         let table = self
             .tables
             .get(table_name)
             .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
 
-        let column_name_set: HashSet<_> = column_names.iter().collect();
+        // Detect if this is a "SELECT *"
+        let is_star = matches!(column_names.get(0).map(|s| s.as_str()), Some("*"));
 
-        // Special case: SELECT *
-        if let Some(first) = column_names.get(0) {
-            if first == "*" {
-                return Ok(table.rows.clone());
+        // If not "*", resolve the column names to their indexes
+        let mut idxs: Vec<usize> = Vec::new();
+        if !is_star {
+            for name in column_names {
+                let i = table
+                    .columns
+                    .iter()
+                    .position(|c| c.name == *name)
+                    .ok_or_else(|| {
+                        format!("There is no '{}' column in table '{}'", name, table_name)
+                    })?;
+                idxs.push(i);
             }
         }
 
-        // Check if all selected columns exist
-        for name in column_names {
-            if !table.columns.iter().any(|c| c.name == *name) {
-                return Err(format!(
-                    "There is no '{}' column in table '{}'",
-                    name, table_name
-                ));
-            }
-        }
-
-        // Get indexes of requested columns
-        let mut needed_value_indexes = Vec::new();
-        for (i, column) in table.columns.iter().enumerate() {
-            if column_name_set.contains(&column.name) {
-                needed_value_indexes.push(i);
-            }
-        }
-
-        // Prepare output
+        // Prepare the result set
         let mut result = Vec::new();
 
-        // Iterate over all rows
+        // Iterate over rows
         for row in &table.rows {
-            // If filter exists, check condition
+            // Apply the WHERE filter if provided
             if let Some(cond) = &filter {
                 let keep = eval_condition(cond, row, &table.columns).map_err(|e| e.to_string())?;
                 if !keep {
-                    continue; // skip this row
+                    continue; // Skip rows that don't match
                 }
             }
 
-            // Build row with only selected columns
-            let filtered_values = row
-                .values
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| needed_value_indexes.contains(i))
-                .map(|(_, v)| v.clone())
-                .collect();
-
-            result.push(Row {
-                values: filtered_values,
-            });
+            // Project columns: either all or the selected ones
+            if is_star {
+                result.push(Row {
+                    values: row.values.clone(),
+                });
+            } else {
+                let projected = idxs.iter().map(|&i| row.values[i].clone()).collect();
+                result.push(Row { values: projected });
+            }
         }
 
+        // Return the final rows
         Ok(result)
     }
 }

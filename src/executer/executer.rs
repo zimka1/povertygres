@@ -24,11 +24,14 @@ pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
             column_names,
             filter,
         } => {
-            // Step 1: Retrieve rows from the table (projection of requested columns)
             let rows = db.select(&table_name, &column_names, filter)?;
-
-            // Step 2: Print results in a formatted table
-            print_table(&column_names, &rows);
+            let table_ref = db.tables.get(&table_name).expect("table not found");
+            if column_names.get(0).unwrap() == "*" {
+                let column_names = table_ref.columns.iter().map(|c| c.name.clone()).collect();
+                print_table(&column_names, &rows);
+            } else {
+                print_table(&column_names, &rows);
+            }
         }
         Query::Delete { table_name, filter } => {
             println!("DELETE {:?}", db.delete(&table_name, filter).unwrap())
