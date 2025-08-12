@@ -25,6 +25,12 @@ pub enum Query {
         table_name: String,
         filter: Option<Condition>,
     },
+    Update {
+        table_name: String,
+        column_names: Vec<String>,
+        values: Vec<Value>,
+        filter: Option<Condition>,
+    },
 }
 
 /// Boolean condition tree used for WHERE clauses

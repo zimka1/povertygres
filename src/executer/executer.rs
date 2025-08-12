@@ -36,6 +36,12 @@ pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
         Query::Delete { table_name, filter } => {
             println!("DELETE {:?}", db.delete(&table_name, filter).unwrap())
         }
+        Query::Update {
+            table_name,
+            column_names,
+            values,
+            filter,
+        } => db.update(&table_name, column_names, values, filter)?,
     };
 
     Ok(())

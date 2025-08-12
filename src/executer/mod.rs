@@ -5,3 +5,4 @@ pub mod filter;
 pub mod insert;
 pub mod printer;
 pub mod select;
+pub mod update;

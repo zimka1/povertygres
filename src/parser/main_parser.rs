@@ -3,7 +3,7 @@ use super::{
     where_parser::parse_where,
 };
 use crate::{
-    parser::delete_parser::parse_delete,
+    parser::{delete_parser::parse_delete, update_parser::parse_update},
     types::parser_types::{Condition, Query},
 };
 
@@ -31,6 +31,8 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
         parse_select(input, condition)
     } else if input.to_ascii_lowercase().starts_with("delete ") {
         parse_delete(input, condition)
+    } else if input.to_ascii_lowercase().starts_with("update ") {
+        parse_update(input, condition)
     } else {
         Err("Unrecognized command".to_string())
     }
