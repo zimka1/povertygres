@@ -23,6 +23,7 @@ pub struct Table {
     pub columns: Vec<Column>,
     // Stored rows in the table
     pub rows: Vec<Row>,
+    pub alias: Option<String>
 }
 
 #[derive(Debug, Clone)]

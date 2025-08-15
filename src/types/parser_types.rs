@@ -1,4 +1,4 @@
-use super::storage_types::{Column, Value};
+use super::storage_types::{Column, Value, Table};
 
 /// Abstract Syntax Tree (AST) for parsed SQL-like queries
 #[derive(Debug)]
@@ -16,7 +16,7 @@ pub enum Query {
     },
     /// SELECT col1, col2 FROM table
     Select {
-        table_name: String,
+        from_item: FromItem,
         column_names: Vec<String>, // "*" is represented as ["*"]
         filter: Option<Condition>,
     },
@@ -80,4 +80,19 @@ pub enum Node {
     Col(String),     // column reference
     Val(Value),      // literal value
     Cond(Condition), // fully built condition subtree
+}
+
+enum JoinKind {
+    Inner,
+    Left,
+}
+
+enum FromItem {
+    Table(Table),
+    Join {
+        left: Box<FromItem>,
+        right: Box<FromItem>,
+        kind: JoinKind,
+        on: Condition,       
+    },
 }
