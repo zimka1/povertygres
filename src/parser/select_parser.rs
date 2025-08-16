@@ -1,4 +1,5 @@
-use crate::types::parser_types::{Condition, Query};
+use crate::types::parser_types::{Condition, FromItem, Query, TableRef, JoinKind};
+use super::where_parser::parse_where;
 
 pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, String> {
     let prefix = "select ";
@@ -14,20 +15,97 @@ pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, Str
     .collect();
 
     let after_columns = input[from_index..].trim();
-    
+    let mut current_from: Option<FromItem> = None;
     let tokens = tokenize(after_columns);
+    let mut i = 0;
+    let mut join_type: Option<JoinKind> = None;
+    while i < tokens.len() {
+        match tokens[i].to_ascii_lowercase().as_str() {
+            "from" => {
+                let table = parse_from_item(&tokens, &mut i)?;
+                current_from = Some(table);
+            },
+            "left" => {
+                join_type = Some(JoinKind::Left);
+                i += 1;
+            },
+            "inner" => {
+                join_type = Some(JoinKind::Inner);
+                i += 1;
+            }
+            "join" => {
+                let right_table = parse_from_item(&tokens, &mut i)?;
+                expect_token("on", &tokens, &mut i)?;
+                let on_condition: Condition = parse_condition(&tokens, &mut i)?;
+                let left_item = current_from.take().expect("JOIN without left side");
+                current_from = Some(FromItem::Join {
+                    left: Box::new(left_item),
+                    right: Box::new(right_table),
+                    kind: join_type.take().unwrap_or(JoinKind::Inner),
+                    on: on_condition,
+                });
+            },
+            _ => { i += 1; }
+        }
+    }
 
     println!("{:?}", tokens);
     
-    return Ok(Query::Select {
-        table_name: table_name.to_string(),
+    Ok(Query::Select {
+        from_table: current_from.unwrap(),
         column_names,
         filter,
-    });
+    })
 }
 
 
-pub fn tokenize(input: &str) -> Vec<String> {
+fn parse_from_item(tokens: &[String], i: &mut usize) -> Result<FromItem, String> {
+    *i += 1;
+    let name = tokens.get(*i)
+        .ok_or_else(|| format!("Expected table name at position {}", i))?
+        .to_string();
+    *i += 1;
+
+    let alias = if tokens.get(*i).map(|t| t.eq_ignore_ascii_case("as")).unwrap_or(false) {
+        *i += 1;
+        Some(tokens.get(*i)
+            .ok_or_else(|| format!("Expected alias after AS at position {}", i))?
+            .to_string())
+    } else {
+        None
+    };
+    *i += 1;
+
+    Ok(FromItem::Table(TableRef { name, alias }))
+}
+
+
+
+fn expect_token(exp: &str, tokens: &[String], i: &mut usize) -> Result<(), String> {
+    if tokens.get(*i).map(|t| t.eq_ignore_ascii_case(exp)).unwrap_or(false) {
+        *i += 1;
+        Ok(())
+    } else {
+        Err(format!("Expected '{}', found {:?}", exp, tokens.get(*i)))
+    }
+}
+
+fn parse_condition(tokens: &[String], i: &mut usize) -> Result<Condition, String> {
+    let mut cond = String::from("");
+    while *i < tokens.len() {
+        match tokens[*i].to_ascii_lowercase().as_str() {
+            "left" | "inner" | "join" => break,
+            _ => {
+                cond.push_str(tokens[*i].as_str());
+                cond.push(' ');
+            }
+        }
+        *i += 1;
+    }
+    parse_where(&cond)
+}
+
+fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut chars = input.chars().peekable();

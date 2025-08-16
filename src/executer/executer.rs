@@ -1,5 +1,6 @@
 use super::printer::print_table;
-use crate::types::parser_types::Query;
+use super::select::TableArg;
+use crate::types::parser_types::{FromItem, Query};
 use crate::types::storage_types::Database;
 
 // Executes a parsed query (AST) against the database
@@ -20,12 +21,15 @@ pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
 
         // SELECT ... FROM table -> fetch and print matching rows
         Query::Select {
-            table_name,
+            from_table,
             column_names,
             filter,
         } => {
-            let rows = db.select(&table_name, &column_names, filter)?;
-            let table_ref = db.tables.get(&table_name).expect("table not found");
+            let (table_ref, rows) = if let FromItem::Table(tab) = from_table{
+                db.select(&TableArg::TableName(tab.name), &column_names, filter)?
+            } else {
+                let collected_join_table = db.collect_join_table(from_table);
+            };
             if column_names.get(0).unwrap() == "*" {
                 let column_names = table_ref.columns.iter().map(|c| c.name.clone()).collect();
                 print_table(&column_names, &rows);

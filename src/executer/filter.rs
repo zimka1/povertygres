@@ -1,6 +1,6 @@
 use crate::errors::eval_error::{EvalError, EvalResult};
 use crate::types::filter_types::CmpOp;
-use crate::types::parser_types::Condition;
+use crate::types::parse_types::Condition;
 use crate::types::storage_types::ValueType;
 use crate::types::storage_types::{Column, Row, Value};
 
@@ -134,6 +134,86 @@ pub fn eval_condition(cond: &Condition, row: &Row, columns: &Vec<Column>) -> Eva
         // Logical NOT
         Condition::Not(x) => {
             let v = eval_condition(x, row, columns)?;
+            Ok(!v)
+        }
+    }
+}
+
+
+/// Looks up a column's value either in left or right table
+pub fn lookup_col_with_side<'a>(
+    name: &str,
+    left_cols: &'a Vec<Column>,
+    left_row: &'a Row,
+    right_cols: &'a Vec<Column>,
+    right_row: &'a Row,
+) -> EvalResult<&'a Value> {
+    if let Some(idx) = left_cols.iter().position(|c| c.name == *name) {
+        return left_row
+            .values
+            .get(idx)
+            .ok_or(EvalError::Internal("row.values index out of bounds (left)"));
+    }
+
+    if let Some(idx) = right_cols.iter().position(|c| c.name == *name) {
+        return right_row
+            .values
+            .get(idx)
+            .ok_or(EvalError::Internal("row.values index out of bounds (right)"));
+    }
+
+    Err(EvalError::UnknownColumn(name.to_string()))
+}
+
+/// Evaluates a condition in JOIN context (both left & right rows available)
+pub fn eval_condition_on(
+    cond: &Condition,
+    left_row: &Row,
+    left_cols: &Vec<Column>,
+    right_row: &Row,
+    right_cols: &Vec<Column>,
+) -> EvalResult<bool> {
+    match cond {
+        Condition::Eq(col_name, lit) => {
+            let lv = lookup_col_with_side(col_name, left_cols, left_row, right_cols, right_row)?;
+            cmp_values(CmpOp::Eq, lv, lit)
+        }
+        Condition::Neq(col_name, lit) => {
+            let lv = lookup_col_with_side(col_name, left_cols, left_row, right_cols, right_row)?;
+            cmp_values(CmpOp::Ne, lv, lit)
+        }
+        Condition::Lt(col_name, lit) => {
+            let lv = lookup_col_with_side(col_name, left_cols, left_row, right_cols, right_row)?;
+            cmp_values(CmpOp::Lt, lv, lit)
+        }
+        Condition::Lte(col_name, lit) => {
+            let lv = lookup_col_with_side(col_name, left_cols, left_row, right_cols, right_row)?;
+            cmp_values(CmpOp::Lte, lv, lit)
+        }
+        Condition::Gt(col_name, lit) => {
+            let lv = lookup_col_with_side(col_name, left_cols, left_row, right_cols, right_row)?;
+            cmp_values(CmpOp::Gt, lv, lit)
+        }
+        Condition::Gte(col_name, lit) => {
+            let lv = lookup_col_with_side(col_name, left_cols, left_row, right_cols, right_row)?;
+            cmp_values(CmpOp::Gte, lv, lit)
+        }
+        Condition::And(a, b) => {
+            let la = eval_condition_on(a, left_row, left_cols, right_row, right_cols)?;
+            if !la {
+                return Ok(false);
+            }
+            eval_condition_on(b, left_row, left_cols, right_row, right_cols)
+        }
+        Condition::Or(a, b) => {
+            let la = eval_condition_on(a, left_row, left_cols, right_row, right_cols)?;
+            if la {
+                return Ok(true);
+            }
+            eval_condition_on(b, left_row, left_cols, right_row, right_cols)
+        }
+        Condition::Not(x) => {
+            let v = eval_condition_on(x, left_row, left_cols, right_row, right_cols)?;
             Ok(!v)
         }
     }

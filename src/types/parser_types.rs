@@ -16,7 +16,7 @@ pub enum Query {
     },
     /// SELECT col1, col2 FROM table
     Select {
-        from_item: FromItem,
+        from_table: FromItem,
         column_names: Vec<String>, // "*" is represented as ["*"]
         filter: Option<Condition>,
     },
@@ -82,13 +82,21 @@ pub enum Node {
     Cond(Condition), // fully built condition subtree
 }
 
-enum JoinKind {
+#[derive(Debug)]
+pub enum JoinKind {
     Inner,
     Left,
 }
 
-enum FromItem {
-    Table(Table),
+#[derive(Debug)]
+pub struct TableRef {
+    pub name: String,
+    pub alias: Option<String>,
+}
+
+#[derive(Debug)]
+pub enum FromItem {
+    Table(TableRef),
     Join {
         left: Box<FromItem>,
         right: Box<FromItem>,

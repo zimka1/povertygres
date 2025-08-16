@@ -1,20 +1,33 @@
 use crate::executer::filter::eval_condition;
 use crate::types::storage_types::Database;
-use crate::types::{parser_types::Condition, storage_types::Row};
+use crate::types::{parser_types::Condition, storage_types::{Row, Table}};
+
+pub enum TableArg {
+    JoinTable(Table),
+    TableName(String)
+}
 
 impl Database {
     // Selects rows from a table with specified column names
     pub fn select(
         &self,
-        table_name: &str,
+        table: &TableArg,
         column_names: &Vec<String>,
         filter: Option<Condition>,
-    ) -> Result<Vec<Row>, String> {
-        // Look up the table by name
-        let table = self
-            .tables
-            .get(table_name)
-            .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
+    ) -> Result<(&Table, Vec<Row>), String> {
+
+        let table = match table{
+            TableArg::JoinTable(join_table) => {
+                join_table
+            },
+            TableArg::TableName(table_name) => {
+                // Look up the table by name
+                self
+                    .tables
+                    .get(table_name)
+                    .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?
+            }
+        }
 
         // Detect if this is a "SELECT *"
         let is_star = matches!(column_names.get(0).map(|s| s.as_str()), Some("*"));
@@ -28,7 +41,7 @@ impl Database {
                     .iter()
                     .position(|c| c.name == *name)
                     .ok_or_else(|| {
-                        format!("There is no '{}' column in table '{}'", name, table_name)
+                        format!("There is no '{}' column in table '{}'", name, table.name)
                     })?;
                 idxs.push(i);
             }
@@ -59,6 +72,6 @@ impl Database {
         }
 
         // Return the final rows
-        Ok(result)
+        Ok((table, result))
     }
 }
