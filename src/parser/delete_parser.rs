@@ -11,4 +11,3 @@ pub fn parse_delete(input: &str, filter: Option<Condition>) -> Result<Query, Str
         filter,
     });
 }
-

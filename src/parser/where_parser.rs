@@ -1,4 +1,5 @@
-use crate::types::parser_types::{Condition, Node, Token};
+use crate::types::filter_types::CmpOp;
+use crate::types::parser_types::{Condition, Node, Operand, Token};
 use crate::types::storage_types::Value;
 
 /// Main entry point for parsing a WHERE clause string into a Condition AST
@@ -67,10 +68,14 @@ fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 tokens.push(Token::Str(text));
                 i += 1;
             }
-            _ if char.is_alphabetic() => {
+            // ↓↓↓ Разрешаем идентификатор начинаться с буквы ИЛИ '_'
+            _ if char.is_alphabetic() || char == '_' => {
                 // Parse identifier or keyword
                 let start = i;
-                while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                // ↓↓↓ Внутри идентификатора разрешаем буквы/цифры/'_'/'.'
+                while i < chars.len()
+                    && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.')
+                {
                     i += 1;
                 }
                 let word: String = chars[start..i].iter().collect();
@@ -80,7 +85,7 @@ fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                     "not" => tokens.push(Token::Not),
                     "true" => tokens.push(Token::Bool(true)),
                     "false" => tokens.push(Token::Bool(false)),
-                    _ => tokens.push(Token::Ident(word)),
+                    _ => tokens.push(Token::Ident(word)), // может быть 'u.id' и т.п.
                 }
             }
             _ if char.is_ascii_digit() => {
@@ -210,25 +215,29 @@ fn rpn_to_condition(rpn: Vec<Token>) -> Result<Condition, String> {
                 let rhs = stack.pop().ok_or("RPN underflow (rhs cond)")?;
                 let lhs = stack.pop().ok_or("RPN underflow (lhs cond)")?;
 
-                // Expect a column on the left and a value on the right
-                let (col, val) = match (lhs, rhs) {
-                    (Node::Col(c), Node::Val(v)) => (c, v),
-                    (l, r) => {
-                        return Err(format!("Expected column op value, got {:?} and {:?}", l, r));
+                // ← Раньше требовал (Col, Val). Теперь преобразуем в Operand с обеих сторон.
+                let to_operand = |n: Node| -> Result<Operand, String> {
+                    match n {
+                        Node::Col(c) => Ok(Operand::Column(c)),
+                        Node::Val(v) => Ok(Operand::Literal(v)),
+                        Node::Cond(_) => Err("Comparison expects operands, not conditions".into()),
                     }
                 };
+                let lhs_op = to_operand(lhs)?;
+                let rhs_op = to_operand(rhs)?;
 
-                // Build the appropriate Condition variant
-                let cond = match token {
-                    Token::Eq => Condition::Eq(col, val),
-                    Token::Neq => Condition::Neq(col, val),
-                    Token::Gt => Condition::Gt(col, val),
-                    Token::Lt => Condition::Lt(col, val),
-                    Token::Gte => Condition::Gte(col, val),
-                    Token::Lte => Condition::Lte(col, val),
+                let op = match token {
+                    Token::Eq => CmpOp::Eq,
+                    Token::Neq => CmpOp::Ne,
+                    Token::Gt => CmpOp::Gt,
+                    Token::Lt => CmpOp::Lt,
+                    Token::Gte => CmpOp::Gte,
+                    Token::Lte => CmpOp::Lte,
                     _ => unreachable!(),
                 };
 
+                // Build the appropriate Condition variant
+                let cond = Condition::Cmp(op, lhs_op, rhs_op);
                 stack.push(Node::Cond(cond));
             }
 
@@ -236,8 +245,6 @@ fn rpn_to_condition(rpn: Vec<Token>) -> Result<Condition, String> {
             Token::And | Token::Or => {
                 let rhs = stack.pop().ok_or("RPN underflow (rhs cond)")?;
                 let lhs = stack.pop().ok_or("RPN underflow (lhs cond)")?;
-
-                // Expect two conditions as operands
                 let (lhs_c, rhs_c) = match (lhs, rhs) {
                     (Node::Cond(a), Node::Cond(b)) => (a, b),
                     (l, r) => {
@@ -247,8 +254,6 @@ fn rpn_to_condition(rpn: Vec<Token>) -> Result<Condition, String> {
                         ));
                     }
                 };
-
-                // Build the logical Condition
                 stack.push(Node::Cond(match token {
                     Token::And => Condition::And(Box::new(lhs_c), Box::new(rhs_c)),
                     Token::Or => Condition::Or(Box::new(lhs_c), Box::new(rhs_c)),

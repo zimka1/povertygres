@@ -1,8 +1,35 @@
 use super::filter::eval_condition;
+use crate::executer::join::JoinTableColumn;
 use crate::types::parser_types::Condition;
-use crate::types::storage_types::Database;
+use crate::types::storage_types::{Column, Database};
 use crate::types::storage_types::{ColumnType, Value};
 use std::collections::HashMap;
+
+/// Build column metadata for a single table
+fn single_meta(table_name: &str, cols: &Vec<Column>) -> Vec<JoinTableColumn> {
+    cols.iter()
+        .map(|c| JoinTableColumn {
+            table_alias: table_name.to_string(),
+            column_name: c.name.clone(),
+        })
+        .collect()
+}
+
+/// Normalize a possibly qualified column name ("table.col" → "col")
+fn normalize_col<'a>(name: &'a str, table_name: &str) -> Result<&'a str, String> {
+    if let Some((t, c)) = name.split_once('.') {
+        if t == table_name {
+            Ok(c)
+        } else {
+            Err(format!(
+                "Qualified column '{}' does not belong to table '{}'",
+                name, table_name
+            ))
+        }
+    } else {
+        Ok(name)
+    }
+}
 
 impl Database {
     /// Updates rows in a table. The last assignment for the same column wins.
@@ -44,15 +71,16 @@ impl Database {
 
         // Verify all provided columns exist
         if targets.len() != last.len() {
-            let mut missing: Vec<&str> = Vec::new();
-            for name in last.keys() {
-                if !table.columns.iter().any(|c| c.name == *name) {
-                    missing.push(*name);
+            let mut missing = Vec::new();
+            for k in last.keys() {
+                match normalize_col(k, table_name) {
+                    Ok(col) if table.columns.iter().any(|c| c.name == col) => {}
+                    _ => missing.push(*k),
                 }
             }
             if !missing.is_empty() {
                 return Err(format!(
-                    "There is no column(s) {:?} in table '{}'",
+                    "Unknown column(s) {:?} for table '{}'",
                     missing, table_name
                 ));
             }
@@ -62,10 +90,10 @@ impl Database {
         for (idx, val) in &targets {
             let column = &table.columns[*idx];
             let ok = match (val, &column.column_type) {
-                (Value::Int(_),  ColumnType::Int)  => true,
+                (Value::Int(_), ColumnType::Int) => true,
                 (Value::Text(_), ColumnType::Text) => true,
                 (Value::Bool(_), ColumnType::Bool) => true,
-                (Value::Null,   _)                 => true, // NULL allowed
+                (Value::Null, _) => true, // NULL allowed
                 _ => false,
             };
             if !ok {
@@ -76,15 +104,20 @@ impl Database {
             }
         }
 
-        // Walk rows, apply WHERE, then write values
+        // Build metadata for evaluation
+        let metas = single_meta(table_name, &table.columns);
+
+        // Walk rows and apply updates
         for row in table.rows.iter_mut() {
             if let Some(cond) = &filter {
-                let keep = eval_condition(cond, row, &table.columns)
-                    .map_err(|e| e.to_string())?;
+                // Apply WHERE condition
+                let keep =
+                    eval_condition(cond, row, &metas, None, None).map_err(|e| e.to_string())?;
                 if !keep {
                     continue;
                 }
             }
+            // Write new values
             for (idx, val) in &targets {
                 row.values[*idx] = (*val).clone();
             }

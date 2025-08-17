@@ -1,6 +1,16 @@
 use crate::executer::filter::eval_condition;
+use crate::executer::join::JoinTableColumn;
 use crate::types::parser_types::Condition;
-use crate::types::storage_types::Database;
+use crate::types::storage_types::{Column, Database};
+
+fn single_meta(table_name: &str, cols: &Vec<Column>) -> Vec<JoinTableColumn> {
+    cols.iter()
+        .map(|c| JoinTableColumn {
+            table_alias: table_name.to_string(),
+            column_name: c.name.clone(),
+        })
+        .collect()
+}
 
 impl Database {
     /// Deletes rows from `table_name` that match `filter`.
@@ -10,30 +20,35 @@ impl Database {
             .tables
             .get_mut(table_name)
             .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
-    
+
         if filter.is_none() {
             let n = table.rows.len();
             table.rows.clear();
             return Ok(n);
         }
-    
+
         let before_len = table.rows.len();
-    
+
+        let metas = single_meta(table_name, &table.columns);
+
         if let Some(cond) = &filter {
             // Remove rows that match the filter (retain returns rows to KEEP)
             // If eval fails, capture the error and return it after.
             let mut err: Option<String> = None;
             table.rows.retain(|row| {
-                match eval_condition(cond, row, &table.columns) {
+                match eval_condition(cond, row, &metas, None, None) {
                     Ok(matches) => !matches, // keep only non-matching rows
-                    Err(e) => { err = Some(e.to_string()); true } // keep row; report error later
+                    Err(e) => {
+                        err = Some(e.to_string());
+                        true
+                    } // keep row; report error later
                 }
             });
             if let Some(e) = err {
                 return Err(e);
             }
         }
-    
+
         Ok(before_len - table.rows.len())
-    }    
+    }
 }

@@ -1,4 +1,8 @@
-use super::storage_types::{Column, Value, Table};
+use std::collections::HashMap;
+
+use crate::types::filter_types::CmpOp;
+
+use super::storage_types::{Column, Value};
 
 /// Abstract Syntax Tree (AST) for parsed SQL-like queries
 #[derive(Debug)]
@@ -17,6 +21,7 @@ pub enum Query {
     /// SELECT col1, col2 FROM table
     Select {
         from_table: FromItem,
+        aliases: HashMap<String, String>,
         column_names: Vec<String>, // "*" is represented as ["*"]
         filter: Option<Condition>,
     },
@@ -33,18 +38,18 @@ pub enum Query {
     },
 }
 
-/// Boolean condition tree used for WHERE clauses
+#[derive(Debug, Clone)]
+pub enum Operand {
+    Column(String),
+    Literal(Value),
+}
+
 #[derive(Debug, Clone)]
 pub enum Condition {
-    Eq(String, Value),                   // column = value
-    Neq(String, Value),                  // column != value
-    Gt(String, Value),                   // column > value
-    Lt(String, Value),                   // column < value
-    Gte(String, Value),                  // column >= value
-    Lte(String, Value),                  // column <= value
-    And(Box<Condition>, Box<Condition>), // logical AND
-    Or(Box<Condition>, Box<Condition>),  // logical OR
-    Not(Box<Condition>),                 // logical NOT
+    Cmp(CmpOp, Operand, Operand),
+    And(Box<Condition>, Box<Condition>),
+    Or(Box<Condition>, Box<Condition>),
+    Not(Box<Condition>),
 }
 
 /// Token types produced by the WHERE clause tokenizer
@@ -89,18 +94,12 @@ pub enum JoinKind {
 }
 
 #[derive(Debug)]
-pub struct TableRef {
-    pub name: String,
-    pub alias: Option<String>,
-}
-
-#[derive(Debug)]
 pub enum FromItem {
-    Table(TableRef),
+    Table(String),
     Join {
         left: Box<FromItem>,
         right: Box<FromItem>,
         kind: JoinKind,
-        on: Condition,       
+        on: Condition,
     },
 }
