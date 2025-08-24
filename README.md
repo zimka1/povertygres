@@ -20,12 +20,13 @@ Goal: implement core PostgreSQL architecture and algorithms.
   - [x] Error handling for unknown columns, type mismatch, invalid operations
 - [x] DELETE FROM ... WHERE ... support with row count return
 - [X] UPDATE ... SET ... WHERE ... support
+- [x] `JOIN` support
+  - [x] `INNER JOIN` with `ON` conditions
+  - [x] `LEFT JOIN` with `NULL` fill for unmatched rows
+
 ---
 
 ## Planned architecture
-
-### Parsing (SQL → AST)
-- [ ] Extend parser with `JOIN`
 
 ### Planner (AST → Logical Plan)
 - [ ] Define `LogicalPlan` (projection, selection, scan)
