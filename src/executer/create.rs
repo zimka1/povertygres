@@ -1,12 +1,13 @@
 use crate::types::storage_types::Database;
 use crate::types::storage_types::{Column, Table};
+use crate::errors::engine_error::EngineError;
 
 impl Database {
     // Adds a new table to the database
-    pub fn create_table(&mut self, name: &str, columns: Vec<Column>) -> Result<(), String> {
+    pub fn create_table(&mut self, name: &str, columns: Vec<Column>) -> Result<(), EngineError> {
         // Check if table already exists
         if self.tables.contains_key(name) {
-            return Err(format!("Table '{}' already exists", name));
+            return Err(EngineError::Database(format!("Table '{}' already exists", name)));
         }
 
         let table = Table {

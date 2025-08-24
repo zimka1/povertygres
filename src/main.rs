@@ -3,14 +3,15 @@ mod errors;
 mod executer;
 mod parser;
 mod types;
+mod catalog;
+mod engine;
 
 use crate::executer::executer::execute;
 use crate::parser::main_parser::parse_query;
-use crate::types::storage_types::Database;
+use crate::engine::Engine;
 
 fn main() {
-    // Initialize an empty in-memory database
-    let mut db = Database::new();
+    let mut engine = Engine::open().expect("catalog init failed");
 
     loop {
         // Print prompt symbol
@@ -36,7 +37,7 @@ fn main() {
         match parse_query(input) {
             Ok(ast) => {
                 // Execute AST on the database
-                if let Err(err) = execute(&mut db, ast) {
+                if let Err(err) = execute(&mut engine, ast) {
                     println!("Execution error: {err}");
                 }
             }

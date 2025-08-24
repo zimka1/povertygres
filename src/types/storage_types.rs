@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use super::catalog_types::CatColumnType;
 
 pub struct Database {
     // Stores tables by their name
@@ -40,6 +41,17 @@ pub enum ColumnType {
     Text,
     Bool,
 }
+
+impl From<CatColumnType> for ColumnType {
+    fn from(c: CatColumnType) -> Self {
+        match c {
+            CatColumnType::Int32 => ColumnType::Int,
+            CatColumnType::Text  => ColumnType::Text,
+            CatColumnType::Bool  => ColumnType::Bool,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct Row {

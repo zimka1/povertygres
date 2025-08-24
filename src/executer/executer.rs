@@ -1,23 +1,26 @@
 use super::printer::print_table;
 use super::select::TableArg;
+use crate::engine;
+use crate::errors::engine_error::EngineError;
 use crate::types::parser_types::{FromItem, Query};
 use crate::types::storage_types::Database;
+use crate::engine::Engine;
 
 /// Executes a parsed query (AST) against the database
-pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
+pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
     match ast {
         // CREATE TABLE name (...)
         Query::CreateTable {
             table_name,
             columns,
-        } => db.create_table(&table_name, columns)?,
+        } => engine.create_table_in_both(&table_name, columns)?,
 
         // INSERT INTO table (...) VALUES (...)
         Query::Insert {
             table_name,
             column_names,
             values,
-        } => db.insert_into(&table_name, column_names, values)?,
+        } => engine.db.insert_into(&table_name, column_names, values)?,
 
         // SELECT ... FROM ...
         Query::Select {
@@ -28,11 +31,11 @@ pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
         } => {
             let (columns, rows) = match from_table {
                 FromItem::Table(table_name) => {
-                    db.select(&TableArg::TableName(table_name), &column_names, filter)?
+                    engine.db.select(&TableArg::TableName(table_name), &column_names, filter)?
                 }
                 _ => {
-                    let join = db.collect_join_table(from_table, &aliases)?;
-                    db.select(&TableArg::JoinTable(join), &column_names, filter)?
+                    let join = engine.db.collect_join_table(from_table, &aliases)?;
+                    engine.db.select(&TableArg::JoinTable(join), &column_names, filter)?
                 }
             };
 
@@ -50,7 +53,7 @@ pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
 
         // DELETE FROM ...
         Query::Delete { table_name, filter } => {
-            let deleted = db.delete(&table_name, filter)?;
+            let deleted = engine.db.delete(&table_name, filter)?;
             println!("DELETE {}", deleted);
         }
 
@@ -60,7 +63,7 @@ pub fn execute(db: &mut Database, ast: Query) -> Result<(), String> {
             column_names,
             values,
             filter,
-        } => db.update(&table_name, column_names, values, filter)?,
+        } => engine.db.update(&table_name, column_names, values, filter)?,
     };
 
     Ok(())
