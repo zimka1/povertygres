@@ -19,9 +19,12 @@ fn phys_to_join(table: &Table, alias: &str) -> JoinTable {
             column_name: c.name.clone(),
         })
         .collect();
+
+    let rows = table.heap.scan_all(&table.columns);
+
     JoinTable {
         columns: cols,
-        rows: table.rows.clone(),
+        rows,
     }
 }
 

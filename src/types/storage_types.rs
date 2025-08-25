@@ -1,6 +1,9 @@
+use crate::page::heap_file::HeapFile;
+
+use super::catalog_types::CatColumnType;
 use std::collections::HashMap;
 use std::fmt;
-use super::catalog_types::CatColumnType;
+use std::path::PathBuf;
 
 pub struct Database {
     // Stores tables by their name
@@ -24,6 +27,7 @@ pub struct Table {
     pub columns: Vec<Column>,
     // Stored rows in the table
     pub rows: Vec<Row>,
+    pub heap: HeapFile,
 }
 
 #[derive(Debug, Clone)]
@@ -46,12 +50,11 @@ impl From<CatColumnType> for ColumnType {
     fn from(c: CatColumnType) -> Self {
         match c {
             CatColumnType::Int32 => ColumnType::Int,
-            CatColumnType::Text  => ColumnType::Text,
-            CatColumnType::Bool  => ColumnType::Bool,
+            CatColumnType::Text => ColumnType::Text,
+            CatColumnType::Bool => ColumnType::Bool,
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Row {

@@ -1,10 +1,10 @@
 use super::printer::print_table;
 use super::select::TableArg;
 use crate::engine;
+use crate::engine::Engine;
 use crate::errors::engine_error::EngineError;
 use crate::types::parser_types::{FromItem, Query};
 use crate::types::storage_types::Database;
-use crate::engine::Engine;
 
 /// Executes a parsed query (AST) against the database
 pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
@@ -31,11 +31,15 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
         } => {
             let (columns, rows) = match from_table {
                 FromItem::Table(table_name) => {
-                    engine.db.select(&TableArg::TableName(table_name), &column_names, filter)?
+                    engine
+                        .db
+                        .select(&TableArg::TableName(table_name), &column_names, filter)?
                 }
                 _ => {
                     let join = engine.db.collect_join_table(from_table, &aliases)?;
-                    engine.db.select(&TableArg::JoinTable(join), &column_names, filter)?
+                    engine
+                        .db
+                        .select(&TableArg::JoinTable(join), &column_names, filter)?
                 }
             };
 
@@ -63,7 +67,9 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
             column_names,
             values,
             filter,
-        } => engine.db.update(&table_name, column_names, values, filter)?,
+        } => engine
+            .db
+            .update(&table_name, column_names, values, filter)?,
     };
 
     Ok(())

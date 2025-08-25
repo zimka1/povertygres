@@ -79,9 +79,10 @@ impl Database {
         }
 
         // Insert row into the table
-        table.rows.push(Row {
+        let row = Row {
             values: final_values,
-        });
+        };
+        table.heap.insert_row(row)?;
         Ok(())
     }
 }

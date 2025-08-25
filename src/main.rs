@@ -1,14 +1,16 @@
 use std::io::{self, Write};
+mod catalog;
+mod consts;
+mod engine;
 mod errors;
 mod executer;
+mod page;
 mod parser;
 mod types;
-mod catalog;
-mod engine;
 
+use crate::engine::Engine;
 use crate::executer::executer::execute;
 use crate::parser::main_parser::parse_query;
-use crate::engine::Engine;
 
 fn main() {
     let mut engine = Engine::open().expect("catalog init failed");
