@@ -4,16 +4,17 @@ use crate::types::page_types::PageHeader;
 impl PageHeader {
     pub fn new(page_no: u32) -> Self {
         Self {
-            page_no,
-            slot_count: 0,
-            free_start: PAGE_HEADER_SIZE as u16,
-            free_end: PAGE_SIZE as u16,
-            checksum: 0,
+            page_no,                       // page number in file
+            slot_count: 0,                 // number of item slots
+            free_start: PAGE_HEADER_SIZE as u16, // beginning of free space
+            free_end: PAGE_SIZE as u16,    // end of free space
+            checksum: 0,                   // checksum (not computed yet)
         }
     }
 
     pub fn to_bytes(&self) -> [u8; PAGE_HEADER_SIZE] {
         let mut buf = [0u8; PAGE_HEADER_SIZE];
+        // serialize header fields into fixed-size buffer
         buf[0..4].copy_from_slice(&self.page_no.to_le_bytes());
         buf[4..6].copy_from_slice(&self.slot_count.to_le_bytes());
         buf[6..8].copy_from_slice(&self.free_start.to_le_bytes());
@@ -23,6 +24,7 @@ impl PageHeader {
     }
 
     pub fn from_bytes(buf: &[u8]) -> Self {
+        // deserialize fields from byte buffer
         Self {
             page_no: u32::from_le_bytes(buf[0..4].try_into().unwrap()),
             slot_count: u16::from_le_bytes(buf[4..6].try_into().unwrap()),
