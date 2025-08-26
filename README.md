@@ -7,22 +7,32 @@ Goal: implement core PostgreSQL architecture and algorithms.
 
 ## Current status
 
-- [x] In-memory table storage
-- [x] `CREATE TABLE` support
-- [x] `INSERT INTO` with/without column list (auto-fill missing columns with `NULL`)
-- [x] `SELECT` with specific columns and `SELECT *`
-- [x] `Value` types: `INT`, `TEXT`, `BOOL`, `NULL`
-- [x] Pretty table output
-- [x] Basic `WHERE` clause support
-  - [x] Comparison operators: `=`, `!=`, `<`, `<=`, `>`, `>=`
-  - [x] Logical operators: `AND`, `OR`, `NOT` (with short-circuit evaluation)
-  - [x] Strict type checking (no implicit casts)
-  - [x] Error handling for unknown columns, type mismatch, invalid operations
-- [x] DELETE FROM ... WHERE ... support with row count return
-- [X] UPDATE ... SET ... WHERE ... support
-- [x] `JOIN` support
-  - [x] `INNER JOIN` with `ON` conditions
-  - [x] `LEFT JOIN` with `NULL` fill for unmatched rows
+* [x] In-memory table storage (initial prototype)
+* [x] Persistent catalog (`catalog.json`) with table definitions
+* [x] Heap-file storage (one `.tbl` file per table)
+
+  * [x] Page layout with fixed-size pages (8KB)
+  * [x] `PageHeader`, `ItemId`, `TupleHeader`, `NullBitmap`
+  * [x] Row serialization (`insert_tuple`)
+  * [x] Row deserialization (`get_tuple`)
+  * [x] Automatic page extension when out of space (`append_page`)
+* [x] `CREATE TABLE` support (writes catalog + creates heap file)
+* [x] `INSERT INTO` with/without column list (auto-fill missing columns with `NULL`, writes row into heap file)
+* [x] `SELECT` with specific columns and `SELECT *` (reads rows from heap files)
+* [x] `Value` types: `INT`, `TEXT`, `BOOL`, `NULL`
+* [x] Pretty table output
+* [x] Basic `WHERE` clause support
+
+  * [x] Comparison operators: `=`, `!=`, `<`, `<=`, `>`, `>=`
+  * [x] Logical operators: `AND`, `OR`, `NOT` (with short-circuit evaluation)
+  * [x] Strict type checking (no implicit casts)
+  * [x] Error handling for unknown columns, type mismatch, invalid operations
+* [x] `DELETE FROM ... WHERE ...` support with row count return
+* [x] `UPDATE ... SET ... WHERE ...` support
+* [x] `JOIN` support
+
+  * [x] `INNER JOIN` with `ON` conditions
+  * [x] `LEFT JOIN` with `NULL` fill for unmatched rows
 
 ---
 
@@ -45,11 +55,10 @@ Goal: implement core PostgreSQL architecture and algorithms.
 ---
 
 ## Storage Engine
-- [ ] `Storage` trait (abstraction layer)
-- [ ] In-memory implementation
-- [ ] File-based storage (1 file per table)
-- [ ] Page layout (fixed-size pages, e.g. 4KB)
-- [ ] Row serialization/deserialization
+* [ ] Storage trait (`Storage` abstraction over in-memory / heap files)
+* [ ] Better row identifier (`RID { page_no, slot_no }`)
+* [ ] Free space management (detect full page, append new one)
+* [ ] Basic VACUUM (reuse dead slots instead of always appending pages)
 
 ---
 
