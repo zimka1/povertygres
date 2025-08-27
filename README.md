@@ -16,6 +16,10 @@ Goal: implement core PostgreSQL architecture and algorithms.
   * [x] Row serialization (`insert_tuple`)
   * [x] Row deserialization (`get_tuple`)
   * [x] Automatic page extension when out of space (`append_page`)
+  * [x] Row deletion support (`delete_at` marks tuple as removed)
+  * [x] Row update support (`update_row` re-inserts modified tuple)
+  * [x] `scan_all_with_pos` to return `(page_no, slot_no, row)` for updates/deletes
+
 * [x] `CREATE TABLE` support (writes catalog + creates heap file)
 * [x] `INSERT INTO` with/without column list (auto-fill missing columns with `NULL`, writes row into heap file)
 * [x] `SELECT` with specific columns and `SELECT *` (reads rows from heap files)
@@ -27,8 +31,9 @@ Goal: implement core PostgreSQL architecture and algorithms.
   * [x] Logical operators: `AND`, `OR`, `NOT` (with short-circuit evaluation)
   * [x] Strict type checking (no implicit casts)
   * [x] Error handling for unknown columns, type mismatch, invalid operations
-* [x] `DELETE FROM ... WHERE ...` support with row count return
-* [x] `UPDATE ... SET ... WHERE ...` support
+
+* [x] `DELETE FROM ... WHERE ...` support with row count return (heap-backed)
+* [x] `UPDATE ... SET ... WHERE ...` support (heap-backed)
 * [x] `JOIN` support
 
   * [x] `INNER JOIN` with `ON` conditions
