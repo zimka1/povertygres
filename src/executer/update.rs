@@ -108,11 +108,11 @@ impl Database {
         let metas = single_meta(table_name, &table.columns);
 
         // Walk rows and apply updates
-        for row in table.rows.iter_mut() {
+        for (page_no, slot_no, mut row) in table.heap.scan_all_with_pos(&table.columns) {
             if let Some(cond) = &filter {
                 // Apply WHERE condition
                 let keep =
-                    eval_condition(cond, row, &metas, None, None).map_err(|e| e.to_string())?;
+                    eval_condition(cond, &row, &metas, None, None).map_err(|e| e.to_string())?;
                 if !keep {
                     continue;
                 }
@@ -121,6 +121,7 @@ impl Database {
             for (idx, val) in &targets {
                 row.values[*idx] = (*val).clone();
             }
+            table.heap.update_row(page_no, slot_no, row)?;
         }
 
         Ok(())

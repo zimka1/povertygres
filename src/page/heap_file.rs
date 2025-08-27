@@ -1,5 +1,6 @@
 use crate::consts::catalog_consts::PAGE_SIZE;
-use crate::types::page_types::Page;
+use crate::consts::page_consts::ITEM_ID_SIZE;
+use crate::types::page_types::{ItemId, Page};
 use crate::types::storage_types::{Column, Row};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -118,4 +119,51 @@ impl HeapFile {
         }
         rows
     }
+
+    pub fn scan_all_with_pos(&self, schema: &[Column]) -> Vec<(u32, usize, Row)> {
+        let mut rows = Vec::new();
+        let metadata = std::fs::metadata(&self.path).expect("metadata failed");
+        let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
+    
+        for page_no in 0..page_count {
+            let page = self.read_page(page_no);
+            for slot_no in 0..page.header.slot_count {
+                if let Some(row) = page.get_tuple(slot_no as usize, schema) {
+                    rows.push((page_no, slot_no as usize, row));
+                }
+            }
+        }
+        rows
+    }    
+
+    pub fn delete_at(&self, page_no: u32, slot_no: usize) -> Result<(), String> {
+        let mut page = self.read_page(page_no);
+        if slot_no as u16 >= page.header.slot_count {
+            return Err("Invalid slot_no".into());
+        }
+
+        let slot_offset: usize = PAGE_SIZE as usize - (slot_no + 1) * ITEM_ID_SIZE;
+        let mut item = ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
+        item.flags = 0; // mark as deleted
+        page.data[slot_offset..slot_offset + ITEM_ID_SIZE].copy_from_slice(&item.to_bytes());
+
+        self.write_page(&page);
+        Ok(())
+    }
+
+    pub fn update_row(&self, page_no: u32, slot_no: usize, new_row: Row) -> Result<(), String> {
+        self.delete_at(page_no, slot_no)?;
+
+        let mut page: Page = self.read_page(page_no);
+        if page.insert_tuple(new_row.clone()).is_ok() {
+            self.write_page(&page);
+            Ok(())
+        } else {
+            let mut new_page = self.append_page();
+            new_page.insert_tuple(new_row).map_err(|e| e.to_string())?;
+            self.write_page(&new_page);
+            Ok(())
+        }
+    }
+
 }

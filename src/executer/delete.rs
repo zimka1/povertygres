@@ -27,28 +27,26 @@ impl Database {
             return Ok(n);
         }
 
-        let before_len = table.rows.len();
+        let mut deleted_count = 0;
 
         let metas = single_meta(table_name, &table.columns);
 
         if let Some(cond) = &filter {
-            // Remove rows that match the filter (retain returns rows to KEEP)
-            // If eval fails, capture the error and return it after.
-            let mut err: Option<String> = None;
-            table.rows.retain(|row| {
-                match eval_condition(cond, row, &metas, None, None) {
-                    Ok(matches) => !matches, // keep only non-matching rows
-                    Err(e) => {
-                        err = Some(e.to_string());
-                        true
-                    } // keep row; report error later
+            let rows = table.heap.scan_all_with_pos(&table.columns);
+
+            for (page_no, slot_no, row) in rows {
+                match eval_condition(cond, &row, &metas, None, None) {
+                    Ok(true) => {
+                        table.heap.delete_at(page_no, slot_no)?;
+                        deleted_count += 1;
+                    }
+                    Ok(false) => { /* keep */ }
+                    Err(e) => return Err(e.to_string()),
                 }
-            });
-            if let Some(e) = err {
-                return Err(e);
             }
         }
 
-        Ok(before_len - table.rows.len())
+        Ok(deleted_count)
+
     }
 }
