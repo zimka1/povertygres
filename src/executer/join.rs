@@ -112,7 +112,7 @@ impl Database {
 
                 Ok(JoinTable {
                     columns,
-                    rows: table.rows.clone(),
+                    rows: table.heap.scan_all(&table.columns),
                 })
             }
         }

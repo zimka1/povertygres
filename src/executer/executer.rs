@@ -43,6 +43,8 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
                 }
             };
 
+            dbg!(&rows);
+
             if column_names.get(0).map(|s| s.as_str()) == Some("*") {
                 // show actual column names, not only table aliases
                 let names = columns

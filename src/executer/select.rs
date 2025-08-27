@@ -90,6 +90,8 @@ impl Database {
             Some(v)
         };
 
+        dbg!(&exec.columns);
+
         // Filter and project rows
         for r in &exec.rows {
             if let Some(cond) = &filter {
