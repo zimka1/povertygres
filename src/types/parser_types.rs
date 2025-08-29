@@ -11,6 +11,7 @@ pub enum Query {
     CreateTable {
         table_name: String,
         columns: Vec<Column>,
+        primary_key: Option<String>
     },
     /// INSERT INTO table (col1, col2) VALUES (...)
     Insert {

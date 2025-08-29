@@ -49,6 +49,9 @@ pub fn parse_insert(input: &str) -> Result<Query, String> {
             if let Ok(num) = raw.parse::<i64>() {
                 return Ok(Value::Int(num));
             }
+            if raw.eq_ignore_ascii_case("null") {
+                return Ok(Value::Null);
+            }
             Err(format!("Unrecognized value: {}", raw))
         })
         .collect();

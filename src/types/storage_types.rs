@@ -1,5 +1,5 @@
 use crate::page::heap_file::HeapFile;
-
+use serde::{Deserialize, Serialize};
 use super::catalog_types::CatColumnType;
 use std::collections::HashMap;
 use std::fmt;
@@ -28,6 +28,7 @@ pub struct Table {
     // Stored rows in the table
     pub rows: Vec<Row>,
     pub heap: HeapFile,
+    pub primary_key: Option<String>
 }
 
 #[derive(Debug, Clone)]
@@ -36,6 +37,8 @@ pub struct Column {
     pub name: String,
     // Data type of the column
     pub column_type: ColumnType,
+    pub not_null: bool,
+    pub default: Option<Value>
 }
 
 // Supported data types for columns
@@ -63,7 +66,7 @@ pub struct Row {
 }
 
 // Represents a single cell value
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Int(i64),
     Text(String),

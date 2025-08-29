@@ -110,15 +110,9 @@ impl Page {
         let tuple_bytes = &self.data[item.offset as usize..(item.offset + item.len) as usize];
 
         // parse tuple header
-        let xmin = u32::from_le_bytes(tuple_bytes[0..4].try_into().unwrap());
         let nullmap_len = u16::from_le_bytes(tuple_bytes[4..6].try_into().unwrap()) as usize;
         let nullmap_bytes = tuple_bytes[6..6 + nullmap_len].to_vec();
         let flags_offset = 6 + nullmap_len;
-        let flags = u16::from_le_bytes(
-            tuple_bytes[flags_offset..flags_offset + 2]
-                .try_into()
-                .unwrap(),
-        );
 
         // construct null bitmap
         let nullmap = NullBitmap {

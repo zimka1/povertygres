@@ -10,6 +10,7 @@ impl Database {
         name: &str,
         columns: Vec<Column>,
         heap_file: HeapFile,
+        primary_key: Option<String>
     ) -> Result<(), EngineError> {
         // Check if table already exists
         if self.tables.contains_key(name) {
@@ -24,6 +25,7 @@ impl Database {
             columns,
             rows: Vec::new(),
             heap: heap_file,
+            primary_key
         };
 
         // Insert table into database

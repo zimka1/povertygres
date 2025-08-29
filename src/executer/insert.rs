@@ -16,7 +16,7 @@ impl Database {
             .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
 
         // Reorder or validate values if column names are specified
-        let final_values: Vec<Value> = if let Some(ref col_names) = column_names {
+        let mut final_values: Vec<Value> = if let Some(ref col_names) = column_names {
             // Check if column count matches
             if col_names.len() != values.len() {
                 return Err(format!(
@@ -77,6 +77,42 @@ impl Database {
                 return Err(format!("Type mismatch at column {} ('{}')", i, column.name));
             }
         }
+
+        // Apply defaults + check not null
+        for (i, column) in table.columns.iter().enumerate() {
+            if let Value::Null = final_values[i] {
+                if let Some(def) = &column.default {
+                    final_values[i] = def.clone();
+                } else if column.not_null {
+                    return Err(format!(
+                        "Column '{}' cannot be NULL",
+                        column.name
+                    ));
+                }
+            }
+        }
+
+        if let Some(pk_name) = &table.primary_key {
+            let Some(pk_idx) = table.columns.iter().position(|c| c.name == *pk_name) else {
+                return Err(format!("Primary key column '{}' not found", pk_name));
+            };
+
+            let pk_val = &final_values[pk_idx];
+            if let Value::Null = pk_val {
+                return Err(format!("Primary key '{}' cannot be NULL", pk_name));
+            }
+
+            let existing_rows = table.heap.scan_all(&table.columns);
+            for row in existing_rows {
+                if row.values[pk_idx] == *pk_val {
+                    return Err(format!(
+                        "duplicate key value violates primary key constraint on '{}'",
+                        pk_name
+                    ));
+                }
+            }
+        }
+
 
         // Insert row into the table
         let row = Row {

@@ -29,6 +29,8 @@ impl Engine {
                         CatColumnType::Text => ColumnType::Text,
                         CatColumnType::Bool => ColumnType::Bool,
                     },
+                    not_null: c.not_null,
+                    default: c.default.clone()
                 })
                 .collect();
             db.tables.insert(
@@ -40,6 +42,7 @@ impl Engine {
                     heap: HeapFile {
                         path: PathBuf::from(&tm.file),
                     },
+                    primary_key: tm.primary_key.clone()
                 },
             );
         }
@@ -50,6 +53,7 @@ impl Engine {
         &mut self,
         name: &str,
         columns: Vec<Column>,
+        primary_key: Option<String>
     ) -> Result<(), EngineError> {
         let cols_meta: Vec<ColumnMeta> = columns
             .iter()
@@ -62,18 +66,20 @@ impl Engine {
                 ColumnMeta {
                     name: col.name.clone(),
                     ty,
+                    not_null: col.not_null,
+                    default: col.default.clone()
                 }
             })
             .collect();
 
-        self.cat.create_table(name, cols_meta)?;
+        self.cat.create_table(name, cols_meta, primary_key.clone())?;
 
         let file_path = format!("{DATA_DIR}/{name}.tbl");
 
         let heap_file = HeapFile::new(file_path.as_str());
 
         self.db
-            .create_table(&name.to_string(), columns, heap_file)?;
+            .create_table(&name.to_string(), columns, heap_file, primary_key)?;
 
         Ok(())
     }

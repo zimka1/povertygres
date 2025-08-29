@@ -55,7 +55,6 @@ pub fn save_catalog_atomic(data_dir: &Path, cat: &Catalog) -> Result<(), Catalog
     // on unix: also sync directory metadata
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
         let dirfd = File::open(data_dir)?;
         dirfd.sync_all()?;
     }

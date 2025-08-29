@@ -1,10 +1,8 @@
 use super::printer::print_table;
 use super::select::TableArg;
-use crate::engine;
 use crate::engine::Engine;
 use crate::errors::engine_error::EngineError;
 use crate::types::parser_types::{FromItem, Query};
-use crate::types::storage_types::Database;
 
 /// Executes a parsed query (AST) against the database
 pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
@@ -13,7 +11,8 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
         Query::CreateTable {
             table_name,
             columns,
-        } => engine.create_table_in_both(&table_name, columns)?,
+            primary_key
+        } => engine.create_table_in_both(&table_name, columns, primary_key)?,
 
         // INSERT INTO table (...) VALUES (...)
         Query::Insert {

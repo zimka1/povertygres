@@ -27,6 +27,7 @@ impl CatalogManager {
         &mut self,
         name: &str,
         columns: Vec<ColumnMeta>, // schema definition for new table
+        primary_key: Option<String>
     ) -> Result<&TableMeta, CatalogError> {
         // Prevent duplicate table creation
         if self.catalog.has_table(name) {
@@ -48,6 +49,7 @@ impl CatalogManager {
             file,
             columns,
             next_rowid: 1, // start row id counter
+            primary_key
         };
 
         // Update catalog state

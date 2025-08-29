@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use super::storage_types::Value;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -13,6 +14,8 @@ pub struct ColumnMeta {
     pub name: String,            // column name
     #[serde(rename = "type")]
     pub ty: CatColumnType,       // column type
+    pub not_null: bool,
+    pub default: Option<Value>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +24,7 @@ pub struct TableMeta {
     pub file: String,            // file path for table storage
     pub columns: Vec<ColumnMeta>,// schema definition
     pub next_rowid: u64,         // auto-increment row ID counter
+    pub primary_key: Option<String>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
