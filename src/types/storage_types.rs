@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use super::catalog_types::CatColumnType;
 use std::collections::HashMap;
 use std::fmt;
-use std::path::PathBuf;
 
 pub struct Database {
     // Stores tables by their name
@@ -28,7 +27,8 @@ pub struct Table {
     // Stored rows in the table
     pub rows: Vec<Row>,
     pub heap: HeapFile,
-    pub primary_key: Option<String>
+    pub primary_key: Option<String>,
+    pub foreign_keys: Vec<ForeignKeyConstraint>,
 }
 
 #[derive(Debug, Clone)]
@@ -116,4 +116,11 @@ impl Value {
             Value::Null => ValueType::Null,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForeignKeyConstraint {
+    pub local_columns: Vec<String>,
+    pub referenced_table: String,
+    pub referenced_columns: Vec<String>
 }

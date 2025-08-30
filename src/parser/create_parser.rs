@@ -1,5 +1,5 @@
 use crate::types::parser_types::Query;
-use crate::types::storage_types::{Column, ColumnType, Value};
+use crate::types::storage_types::{Column, ColumnType, ForeignKeyConstraint, Value};
 
 pub fn parse_create_table(input: &str) -> Result<Query, String> {
     let prefix = "create table ";
@@ -13,11 +13,14 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
     let table_name = after_prefix[..paren_index].trim();
 
     // Extract column definitions between parentheses
-    let inside_parens = after_prefix[paren_index + 1..].trim_end_matches(')').trim();
+    let rest = &after_prefix[paren_index + 1..];
+    let close_index = rest.rfind(')').ok_or("Missing closing ')' in create table")?;
+    let inside_parens = &rest[..close_index].trim();
     let column_defs: Vec<&str> = inside_parens.split(',').collect();
 
     let mut columns = Vec::new();
     let mut primary_key: Option<String> = None;
+    let mut foreign_keys = Vec::new();
 
     for col_def in column_defs {
         let tokens: Vec<&str> = col_def.trim().split_whitespace().collect();
@@ -35,6 +38,53 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                 return Err("Invalid PRIMARY KEY syntax".into());
             }
         }
+
+        if tokens[0].eq_ignore_ascii_case("foreign") {
+            if tokens.len() >= 5 && tokens[1].eq_ignore_ascii_case("key") {
+                let local_col = tokens[2].trim_matches(|c| c == '(' || c == ')');
+        
+                if !tokens[3].eq_ignore_ascii_case("references") {
+                    return Err("Expected 'references' after FOREIGN KEY".into());
+                }
+        
+                let ref_table_token = tokens[4];
+        
+                let (ref_table, ref_col) = if ref_table_token.contains('(') {
+                    match (ref_table_token.find('('), ref_table_token.find(')')) {
+                        (Some(open), Some(close)) if close > open => {
+                            let table = &ref_table_token[..open];
+                            let col = &ref_table_token[open + 1..close];
+                            if table.trim().is_empty() || col.trim().is_empty() {
+                                return Err("Invalid FOREIGN KEY reference format".into());
+                            }
+                            (table.trim(), col.trim())
+                        }
+                        _ => {
+                            return Err("Invalid FOREIGN KEY reference format".into());
+                        }
+                    }
+                } else {
+                    // ref_table col
+                    let ref_table = ref_table_token;
+                    let ref_col = tokens
+                        .get(5)
+                        .map(|s| s.trim_matches(|c| c == '(' || c == ')'))
+                        .ok_or("Missing referenced column")?;
+                    (ref_table, ref_col)
+                };
+        
+                foreign_keys.push(ForeignKeyConstraint {
+                    local_columns: vec![local_col.to_string()],
+                    referenced_table: ref_table.to_string(),
+                    referenced_columns: vec![ref_col.to_string()],
+                });
+                continue;
+            } else {
+                return Err("Invalid FOREIGN KEY syntax".into());
+            }
+        }
+        
+
 
         let name = tokens[0];
         let type_str = tokens.get(1).ok_or("Missing column type")?;
@@ -61,7 +111,32 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                     primary_key = Some(name.to_string());
                     not_null = true; // PK always NOT NULL
                     i += 2;
-                }
+                },
+                "references" if i + 1 < tokens.len() => {
+                    let ref_token = tokens[i + 1];
+                    if let Some(open) = ref_token.find('(') {
+                        let close = ref_token.find(')').ok_or("Invalid REFERENCES syntax")?;
+                        let ref_table = &ref_token[..open];
+                        let ref_col = &ref_token[open+1..close];
+                        foreign_keys.push(ForeignKeyConstraint {
+                            local_columns: vec![name.to_string()],
+                            referenced_table: ref_table.trim().to_string(),
+                            referenced_columns: vec![ref_col.trim().to_string()],
+                        });
+                        i += 2;
+                    } else {
+                        let ref_table = tokens[i + 1];
+                        let ref_col = tokens.get(i + 2)
+                            .ok_or("Missing column in REFERENCES")?
+                            .trim_matches(|c| c == '(' || c == ')');
+                        foreign_keys.push(ForeignKeyConstraint {
+                            local_columns: vec![name.to_string()],
+                            referenced_table: ref_table.to_string(),
+                            referenced_columns: vec![ref_col.to_string()],
+                        });
+                        i += 3;
+                    }
+                },
                 "default" if i + 1 < tokens.len() => {
                     let val_str = tokens[i + 1];
                     let val = if val_str.starts_with('"') && val_str.ends_with('"') {
@@ -96,5 +171,6 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
         table_name: table_name.to_string(),
         columns,
         primary_key,
+        foreign_keys
     });
 }

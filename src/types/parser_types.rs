@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::types::filter_types::CmpOp;
+use crate::types::{filter_types::CmpOp, storage_types::ForeignKeyConstraint};
 
 use super::storage_types::{Column, Value};
 
@@ -11,7 +11,8 @@ pub enum Query {
     CreateTable {
         table_name: String,
         columns: Vec<Column>,
-        primary_key: Option<String>
+        primary_key: Option<String>,
+        foreign_keys: Vec<ForeignKeyConstraint>,
     },
     /// INSERT INTO table (col1, col2) VALUES (...)
     Insert {

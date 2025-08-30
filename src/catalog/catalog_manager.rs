@@ -2,6 +2,7 @@ use super::io::*;
 use crate::consts::catalog_consts::DATA_DIR;
 use crate::errors::catalog_error::CatalogError;
 use crate::types::catalog_types::{Catalog, ColumnMeta, TableMeta};
+use crate::types::storage_types::ForeignKeyConstraint;
 use std::path::{Path, PathBuf};
 
 pub struct CatalogManager {
@@ -27,7 +28,8 @@ impl CatalogManager {
         &mut self,
         name: &str,
         columns: Vec<ColumnMeta>, // schema definition for new table
-        primary_key: Option<String>
+        primary_key: Option<String>,
+        foreign_keys: Vec<ForeignKeyConstraint>,
     ) -> Result<&TableMeta, CatalogError> {
         // Prevent duplicate table creation
         if self.catalog.has_table(name) {
@@ -49,7 +51,8 @@ impl CatalogManager {
             file,
             columns,
             next_rowid: 1, // start row id counter
-            primary_key
+            primary_key,
+            foreign_keys
         };
 
         // Update catalog state

@@ -3,7 +3,7 @@ use crate::consts::catalog_consts::DATA_DIR;
 use crate::errors::engine_error::EngineError;
 use crate::page::heap_file::{HeapFile};
 use crate::types::catalog_types::{CatColumnType, ColumnMeta};
-use crate::types::storage_types::ColumnType;
+use crate::types::storage_types::{ColumnType, ForeignKeyConstraint};
 use crate::types::storage_types::{Column, Database, Table};
 
 use std::path::{Path, PathBuf};
@@ -42,7 +42,8 @@ impl Engine {
                     heap: HeapFile {
                         path: PathBuf::from(&tm.file),
                     },
-                    primary_key: tm.primary_key.clone()
+                    primary_key: tm.primary_key.clone(),
+                    foreign_keys: tm.foreign_keys.clone(),
                 },
             );
         }
@@ -53,7 +54,8 @@ impl Engine {
         &mut self,
         name: &str,
         columns: Vec<Column>,
-        primary_key: Option<String>
+        primary_key: Option<String>,
+        foreign_keys: Vec<ForeignKeyConstraint>
     ) -> Result<(), EngineError> {
         let cols_meta: Vec<ColumnMeta> = columns
             .iter()
@@ -72,14 +74,14 @@ impl Engine {
             })
             .collect();
 
-        self.cat.create_table(name, cols_meta, primary_key.clone())?;
+        self.cat.create_table(name, cols_meta, primary_key.clone(), foreign_keys.clone())?;
 
         let file_path = format!("{DATA_DIR}/{name}.tbl");
 
         let heap_file = HeapFile::new(file_path.as_str());
 
         self.db
-            .create_table(&name.to_string(), columns, heap_file, primary_key)?;
+            .create_table(&name.to_string(), columns, heap_file, primary_key, foreign_keys)?;
 
         Ok(())
     }

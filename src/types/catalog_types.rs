@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use crate::types::storage_types::ForeignKeyConstraint;
+
 use super::storage_types::Value;
 use std::collections::BTreeMap;
 
@@ -24,7 +26,8 @@ pub struct TableMeta {
     pub file: String,            // file path for table storage
     pub columns: Vec<ColumnMeta>,// schema definition
     pub next_rowid: u64,         // auto-increment row ID counter
-    pub primary_key: Option<String>
+    pub primary_key: Option<String>,
+    pub foreign_keys: Vec<ForeignKeyConstraint>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

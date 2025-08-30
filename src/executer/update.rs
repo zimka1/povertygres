@@ -43,7 +43,7 @@ impl Database {
         // Find the table
         let table = self
             .tables
-            .get_mut(table_name)
+            .get(table_name)
             .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
 
         // Column/value counts must match
@@ -121,6 +121,62 @@ impl Database {
             for (idx, val) in &targets {
                 row.values[*idx] = (*val).clone();
             }
+
+            for fk in &table.foreign_keys {
+                let mut local_values = Vec::new();
+                for col_name in &fk.local_columns {
+                    let Some(idx) = table.columns.iter().position(|c| c.name == *col_name) else {
+                        return Err(format!(
+                            "Foreign key error: local column '{}' not found in '{}'",
+                            col_name, table.name
+                        ));
+                    };
+                    local_values.push(row.values[idx].clone());
+                }
+            
+                if local_values.iter().all(|v| matches!(v, Value::Null)) {
+                    continue;
+                }
+            
+                let parent_table = self.tables.get(&fk.referenced_table).ok_or_else(|| {
+                    format!(
+                        "Foreign key error: referenced table '{}' not found",
+                        fk.referenced_table
+                    )
+                })?;
+            
+                let mut ref_indices = Vec::new();
+                for ref_col in &fk.referenced_columns {
+                    let Some(idx) = parent_table.columns.iter().position(|c| c.name == *ref_col) else {
+                        return Err(format!(
+                            "Foreign key error: referenced column '{}' not found in '{}'",
+                            ref_col, fk.referenced_table
+                        ));
+                    };
+                    ref_indices.push(idx);
+                }
+            
+                let parent_rows = parent_table.heap.scan_all(&parent_table.columns);
+                let mut found = false;
+                for prow in parent_rows {
+                    if local_values
+                        .iter()
+                        .zip(ref_indices.iter())
+                        .all(|(lv, ri)| &prow.values[*ri] == lv)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+            
+                if !found {
+                    return Err(format!(
+                        "update on table '{}' violates foreign key constraint: {:?} -> {}({:?})",
+                        table.name, fk.local_columns, fk.referenced_table, fk.referenced_columns
+                    ));
+                }
+            }
+            
             table.heap.update_row(page_no, slot_no, row)?;
         }
 

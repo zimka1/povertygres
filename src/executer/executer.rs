@@ -11,8 +11,9 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
         Query::CreateTable {
             table_name,
             columns,
-            primary_key
-        } => engine.create_table_in_both(&table_name, columns, primary_key)?,
+            primary_key,
+            foreign_keys
+        } => engine.create_table_in_both(&table_name, columns, primary_key, foreign_keys)?,
 
         // INSERT INTO table (...) VALUES (...)
         Query::Insert {
@@ -41,8 +42,6 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
                         .select(&TableArg::JoinTable(join), &column_names, filter)?
                 }
             };
-
-            dbg!(&rows);
 
             if column_names.get(0).map(|s| s.as_str()) == Some("*") {
                 // show actual column names, not only table aliases
