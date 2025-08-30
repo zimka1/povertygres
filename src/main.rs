@@ -8,12 +8,34 @@ mod page;
 mod parser;
 mod types;
 
+use std::env;
+use std::fs;
 use crate::engine::Engine;
 use crate::executer::executer::execute;
 use crate::parser::main_parser::parse_query;
 
 fn main() {
     let mut engine = Engine::open().expect("catalog init failed");
+
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() > 1 && args[1] == "--file" {
+        let filename = &args[2];
+        let contents = fs::read_to_string(filename).expect("Failed to read file");
+        for stmt in contents.split(';') {
+            let stmt = stmt.trim();
+            if stmt.is_empty() { continue; }
+            match parse_query(stmt) {
+                Ok(ast) => {
+                    if let Err(err) = execute(&mut engine, ast) {
+                        eprintln!("Execution error: {err}");
+                    }
+                }
+                Err(err) => eprintln!("Parse error: {err}"),
+            }
+        }
+        return;
+    }
 
     loop {
         // Print prompt symbol

@@ -20,7 +20,6 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
         let after_where = input[index + "where".len()..].trim();
         input = input[..index].trim();
         condition = Some(parse_where(after_where)?);
-        println!("{:?}", condition);
     }
 
     if input.to_ascii_lowercase().starts_with("create table ") {

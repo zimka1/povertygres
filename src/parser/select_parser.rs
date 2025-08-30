@@ -58,8 +58,6 @@ pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, Str
         }
     }
 
-    println!("{:?}", tokens);
-
     Ok(Query::Select {
         from_table: current_from.unwrap(),
         aliases,
