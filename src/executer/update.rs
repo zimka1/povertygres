@@ -40,7 +40,7 @@ impl Database {
         parsed_values: Vec<Value>,
         filter: Option<Condition>,
     ) -> Result<(), String> {
-        // Find the table
+        // Find the table (immutable reference only, rows will be updated later)
         let table = self
             .tables
             .get(table_name)
@@ -86,7 +86,7 @@ impl Database {
             }
         }
 
-        // Type-check each assignment
+        // Type-check each assignment against schema
         for (idx, val) in &targets {
             let column = &table.columns[*idx];
             let ok = match (val, &column.column_type) {
@@ -104,7 +104,7 @@ impl Database {
             }
         }
 
-        // Build metadata for evaluation
+        // Build metadata for evaluation of WHERE condition
         let metas = single_meta(table_name, &table.columns);
 
         // Walk rows and apply updates
@@ -117,11 +117,13 @@ impl Database {
                     continue;
                 }
             }
-            // Write new values
+
+            // Write new values into row
             for (idx, val) in &targets {
                 row.values[*idx] = (*val).clone();
             }
 
+            // Foreign key validation for updated row
             for fk in &table.foreign_keys {
                 let mut local_values = Vec::new();
                 for col_name in &fk.local_columns {
@@ -134,6 +136,7 @@ impl Database {
                     local_values.push(row.values[idx].clone());
                 }
             
+                // Skip check if all FK columns are NULL
                 if local_values.iter().all(|v| matches!(v, Value::Null)) {
                     continue;
                 }
@@ -177,6 +180,7 @@ impl Database {
                 }
             }
             
+            // If all checks pass, write updated row back to storage
             table.heap.update_row(page_no, slot_no, row)?;
         }
 

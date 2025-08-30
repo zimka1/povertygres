@@ -1,6 +1,7 @@
 use crate::types::parser_types::Query;
 use crate::types::storage_types::{Column, ColumnType, ForeignKeyConstraint, Value};
 
+/// Parse a CREATE TABLE SQL statement into a Query::CreateTable AST node
 pub fn parse_create_table(input: &str) -> Result<Query, String> {
     let prefix = "create table ";
     let after_prefix = &input[prefix.len()..];
@@ -29,6 +30,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
             continue;
         }
 
+        // Handle table-level PRIMARY KEY constraint
         if tokens[0].eq_ignore_ascii_case("primary") {
             if tokens.len() >= 3 && tokens[1].eq_ignore_ascii_case("key") {
                 let pk_col = tokens[2].trim_matches(|c| c == '(' || c == ')');
@@ -39,6 +41,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
             }
         }
 
+        // Handle table-level FOREIGN KEY constraint
         if tokens[0].eq_ignore_ascii_case("foreign") {
             if tokens.len() >= 5 && tokens[1].eq_ignore_ascii_case("key") {
                 let local_col = tokens[2].trim_matches(|c| c == '(' || c == ')');
@@ -64,7 +67,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                         }
                     }
                 } else {
-                    // ref_table col
+                    // "table column" form
                     let ref_table = ref_table_token;
                     let ref_col = tokens
                         .get(5)
@@ -84,8 +87,6 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
             }
         }
         
-
-
         let name = tokens[0];
         let type_str = tokens.get(1).ok_or("Missing column type")?;
 
@@ -100,6 +101,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
         let mut not_null = false;
         let mut default: Option<Value> = None;
 
+        // Parse column constraints
         let mut i = 2;
         while i < tokens.len() {
             match tokens[i].to_ascii_lowercase().as_str() {
@@ -112,6 +114,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                     not_null = true; // PK always NOT NULL
                     i += 2;
                 },
+                // Handle column-level REFERENCES constraint
                 "references" if i + 1 < tokens.len() => {
                     let ref_token = tokens[i + 1];
                     if let Some(open) = ref_token.find('(') {
@@ -137,6 +140,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                         i += 3;
                     }
                 },
+                // Handle DEFAULT values
                 "default" if i + 1 < tokens.len() => {
                     let val_str = tokens[i + 1];
                     let val = if val_str.starts_with('"') && val_str.ends_with('"') {
@@ -167,10 +171,10 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
         });
     }
 
-    return Ok(Query::CreateTable {
+    Ok(Query::CreateTable {
         table_name: table_name.to_string(),
         columns,
         primary_key,
         foreign_keys
-    });
+    })
 }

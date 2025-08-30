@@ -9,7 +9,7 @@ impl Database {
         column_names: Option<Vec<String>>, // Optional: user can specify columns
         values: Vec<Value>,                // Values to insert
     ) -> Result<(), String> {
-        // Get the target table
+        // Get the target table (immutable for now)
         let table = self
             .tables
             .get(table_name)
@@ -36,7 +36,7 @@ impl Database {
                 }
             }
 
-            // Fill row with Nulls, then replace values for matched columns
+            // Fill row with NULLs, then replace values for matched columns
             let mut row = vec![Value::Null; table.columns.len()];
 
             for (col_name, value) in col_names.iter().zip(values.iter()) {
@@ -78,7 +78,7 @@ impl Database {
             }
         }
 
-        // Apply defaults + check not null
+        // Apply defaults + check NOT NULL constraints
         for (i, column) in table.columns.iter().enumerate() {
             if let Value::Null = final_values[i] {
                 if let Some(def) = &column.default {
@@ -92,6 +92,7 @@ impl Database {
             }
         }
 
+        // Enforce primary key uniqueness
         if let Some(pk_name) = &table.primary_key {
             let Some(pk_idx) = table.columns.iter().position(|c| c.name == *pk_name) else {
                 return Err(format!("Primary key column '{}' not found", pk_name));
@@ -113,6 +114,7 @@ impl Database {
             }
         }
 
+        // Foreign key validation
         for fk in &table.foreign_keys {
             let mut local_values = Vec::new();
             for col_name in &fk.local_columns {
@@ -171,12 +173,13 @@ impl Database {
             }
         }
 
+        // Now reopen table mutably to perform the actual insert
         let table = self
             .tables
             .get_mut(table_name)
             .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
 
-        // Insert row into the table
+        // Insert row into the table's heap
         let row = Row {
             values: final_values,
         };

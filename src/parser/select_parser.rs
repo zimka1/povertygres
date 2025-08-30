@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use super::where_parser::parse_where;
 use crate::types::parser_types::{Condition, FromItem, JoinKind, Query};
 
+/// Parse a SELECT query into a Query::Select AST node
 pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, String> {
     let prefix = "select ";
 
@@ -10,6 +11,7 @@ pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, Str
 
     let from_index = input.find("from").ok_or("Missing 'from'")?;
 
+    // Split column list before FROM
     let column_names: Vec<&str> = input[prefix.len()..from_index].trim().split(',').collect();
 
     let column_names: Vec<String> = column_names
@@ -22,6 +24,8 @@ pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, Str
     let tokens = tokenize(after_columns);
     let mut i = 0;
     let mut join_type: Option<JoinKind> = None;
+
+    // Parse FROM + JOIN clauses
     while i < tokens.len() {
         match tokens[i].to_ascii_lowercase().as_str() {
             "from" => {
@@ -64,6 +68,7 @@ pub fn parse_select(input: &str, filter: Option<Condition>) -> Result<Query, Str
     })
 }
 
+/// Parse a FROM item (table with optional alias)
 fn parse_from_item(
     tokens: &[String],
     i: &mut usize,
@@ -101,6 +106,7 @@ fn parse_from_item(
     Ok(FromItem::Table(name))
 }
 
+/// Ensure the next token matches the expected keyword
 fn expect_token(exp: &str, tokens: &[String], i: &mut usize) -> Result<(), String> {
     if tokens
         .get(*i)
@@ -114,6 +120,7 @@ fn expect_token(exp: &str, tokens: &[String], i: &mut usize) -> Result<(), Strin
     }
 }
 
+/// Parse a join ON condition until the next JOIN/keyword
 fn parse_condition(tokens: &[String], i: &mut usize) -> Result<Condition, String> {
     let mut cond = String::from("");
     while *i < tokens.len() {
@@ -129,6 +136,7 @@ fn parse_condition(tokens: &[String], i: &mut usize) -> Result<Condition, String
     parse_where(&cond)
 }
 
+/// Tokenize SQL input string into keywords, identifiers and literals
 fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();

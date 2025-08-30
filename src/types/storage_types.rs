@@ -26,8 +26,11 @@ pub struct Table {
     pub columns: Vec<Column>,
     // Stored rows in the table
     pub rows: Vec<Row>,
+    // Low-level heap file storage for rows
     pub heap: HeapFile,
+    // Optional primary key column name
     pub primary_key: Option<String>,
+    // List of foreign key constraints defined on this table
     pub foreign_keys: Vec<ForeignKeyConstraint>,
 }
 
@@ -37,7 +40,9 @@ pub struct Column {
     pub name: String,
     // Data type of the column
     pub column_type: ColumnType,
+    // Whether the column is NOT NULL
     pub not_null: bool,
+    // Optional default value for this column
     pub default: Option<Value>
 }
 
@@ -120,7 +125,10 @@ impl Value {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForeignKeyConstraint {
+    // Local columns in the current table that form the foreign key
     pub local_columns: Vec<String>,
+    // Name of the referenced (parent) table
     pub referenced_table: String,
+    // Columns in the referenced table that are targeted
     pub referenced_columns: Vec<String>
 }

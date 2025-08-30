@@ -100,6 +100,7 @@ impl HeapFile {
         Ok(())
     }
 
+    /// Scan all rows from all pages, decoding tuples using the provided schema
     pub fn scan_all(&self, schema: &[Column]) -> Vec<Row> {
         let mut rows = Vec::new();
 
@@ -120,6 +121,7 @@ impl HeapFile {
         rows
     }
 
+    /// Scan all rows and also return their physical position (page_no, slot_no)
     pub fn scan_all_with_pos(&self, schema: &[Column]) -> Vec<(u32, usize, Row)> {
         let mut rows = Vec::new();
         let metadata = std::fs::metadata(&self.path).expect("metadata failed");
@@ -142,6 +144,7 @@ impl HeapFile {
             return Err("Invalid slot_no".into());
         }
 
+        // compute offset of the item header in the page
         let slot_offset: usize = PAGE_SIZE as usize - (slot_no + 1) * ITEM_ID_SIZE;
         let mut item = ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
         item.flags = 0; // mark as deleted
@@ -151,6 +154,7 @@ impl HeapFile {
         Ok(())
     }
 
+    /// Update an existing row at a given page/slot, or move it if it no longer fits
     pub fn update_row(&self, page_no: u32, slot_no: usize, new_row: Row) -> Result<(), String> {
         self.delete_at(page_no, slot_no)?;
 
@@ -165,5 +169,4 @@ impl HeapFile {
             Ok(())
         }
     }
-
 }
