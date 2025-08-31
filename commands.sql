@@ -10,6 +10,10 @@ create table orders (
     amount int not null
 );
 
+create index users_id_idx on users(id);
+create index users_name_idx on users(name);
+create index orders_user_id_idx on orders(user_id);
+
 insert into users values (1, "Alice", true);
 insert into users values (2, "Bob", false);
 insert into users(id, name) values (3, "Charlie");
@@ -33,3 +37,6 @@ inner join orders as o on u.id = o.user_id;
 select u.name, o.amount
 from users as u
 left join orders as o on u.id = o.user_id;
+
+create index users_id_name_idx on users(id, name);
+select * from users where id = 1 and name = "Alice";

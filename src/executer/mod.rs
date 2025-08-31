@@ -2,6 +2,7 @@ pub mod create;
 pub mod delete;
 pub mod executer;
 pub mod filter;
+pub mod index;
 pub mod insert;
 pub mod join;
 pub mod printer;

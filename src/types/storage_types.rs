@@ -1,5 +1,6 @@
 use super::catalog_types::CatColumnType;
 use crate::storage::heap_file::HeapFile;
+use crate::types::b_tree::BTreeIndex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -7,6 +8,7 @@ use std::fmt;
 pub struct Database {
     // Stores tables by their name
     pub tables: HashMap<String, Table>,
+    pub indexes: HashMap<String, BTreeIndex>,
 }
 
 impl Database {
@@ -14,6 +16,7 @@ impl Database {
     pub fn new() -> Self {
         Self {
             tables: HashMap::new(),
+            indexes: HashMap::new(),
         }
     }
 }
@@ -70,7 +73,7 @@ pub struct Row {
 }
 
 // Represents a single cell value
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Value {
     Int(i64),
     Text(String),

@@ -2,6 +2,7 @@ use crate::catalog::catalog_manager::CatalogManager;
 use crate::consts::catalog_consts::DATA_DIR;
 use crate::errors::engine_error::EngineError;
 use crate::storage::heap_file::HeapFile;
+use crate::types::b_tree::BTreeIndex;
 use crate::types::catalog_types::{CatColumnType, ColumnMeta};
 use crate::types::storage_types::{Column, Database, Table};
 use crate::types::storage_types::{ColumnType, ForeignKeyConstraint};
@@ -45,6 +46,27 @@ impl Engine {
                 },
             );
         }
+
+        for (iname, imeta) in cat.catalog().indexes.iter() {
+            let mut idx = BTreeIndex::new(
+                imeta.name.clone(), imeta.table.clone(), imeta.columns.clone());
+            if let Some(table) = db.tables.get(&imeta.table) {
+                let rows = table.heap.scan_all(&table.columns);
+                for (pos, row) in rows.into_iter().enumerate() {
+                    let mut key = Vec::new();
+                    for col in &imeta.columns {
+                        let col_idx = table
+                            .columns
+                            .iter()
+                            .position(|c| c.name == *col)
+                            .expect("Index column not found in table");
+                        key.push(row.values[col_idx].clone());
+                    }
+                    idx.insert(key, (0, pos));
+                }
+            }
+            db.indexes.insert(iname.clone(), idx);
+        }
         Ok(Self { db, cat })
     }
 
@@ -86,6 +108,20 @@ impl Engine {
             primary_key,
             foreign_keys,
         )?;
+
+        Ok(())
+    }
+
+    pub fn create_index_in_both(
+        &mut self,
+        index_name: &str,
+        table_name: &str,
+        columns: Vec<String>,
+    ) -> Result<(), EngineError> {
+
+        self.cat.create_index(index_name, table_name, &columns)?;
+
+        self.db.create_index(index_name, table_name, columns)?;
 
         Ok(())
     }

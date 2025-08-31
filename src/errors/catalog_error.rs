@@ -12,4 +12,6 @@ pub enum CatalogError {
     TableExists(String),
     #[error("table not found: {0}")]
     TableNotFound(String),
+    #[error("table exists: {0}")]
+    IndexExists(String),
 }

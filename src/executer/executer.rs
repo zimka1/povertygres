@@ -75,7 +75,8 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
             index_name,
             table_name,
             column_names,
-        } => {}
+        } => engine.create_index_in_both(&index_name, &table_name, column_names)?,
+
     };
 
     Ok(())

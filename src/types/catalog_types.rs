@@ -2,7 +2,7 @@ use crate::types::storage_types::ForeignKeyConstraint;
 use serde::{Deserialize, Serialize};
 
 use super::storage_types::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CatColumnType {
@@ -36,6 +36,14 @@ pub struct Catalog {
     pub page_size: u32,                      // page size used by DB
     pub next_table_oid: u32,                 // counter for new table IDs
     pub tables: BTreeMap<String, TableMeta>, // map table name → metadata
+    pub indexes: HashMap<String, IndexMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexMeta {
+    pub name: String,
+    pub table: String,
+    pub columns: Vec<String>,
 }
 
 impl Catalog {
@@ -46,6 +54,7 @@ impl Catalog {
             page_size,
             next_table_oid: 1,
             tables: BTreeMap::new(),
+            indexes: HashMap::new()
         }
     }
 
