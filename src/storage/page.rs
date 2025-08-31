@@ -27,7 +27,7 @@ impl Page {
         Self { header, data: buf }
     }
 
-    pub fn insert_tuple(&mut self, row: Row) -> Result<(), String> {
+    pub fn insert_tuple(&mut self, row: Row) -> Result<usize, String> {
         // build null bitmap
         let mut nullmap_bytes = NullBitmap::new(row.values.len());
         for (i, val) in row.values.iter().enumerate() {
@@ -88,7 +88,7 @@ impl Page {
         self.header.free_start += tuple_len;
         self.header.free_end -= ITEM_ID_SIZE as u16;
 
-        Ok(())
+        Ok((self.header.slot_count - 1) as usize)
     }
 
     pub fn get_tuple(&self, slot_no: usize, columns: &[Column]) -> Option<Row> {

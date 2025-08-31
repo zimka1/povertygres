@@ -77,7 +77,7 @@ impl HeapFile {
         page
     }
 
-    pub fn insert_row(&self, row: Row) -> Result<(), String> {
+    pub fn insert_row(&self, row: Row) -> Result<(usize, usize), String> {
         // find last page number
         let metadata = std::fs::metadata(&self.path).map_err(|e| e.to_string())?;
         let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
@@ -87,17 +87,18 @@ impl HeapFile {
         let mut page = self.read_page(last_page_no);
 
         // try insert row
-        if let Err(_) = page.insert_tuple(row.clone()) {
-            // not enough space → create new page
-            let mut page = self.append_page();
-            page.insert_tuple(row).map_err(|e| e.to_string())?;
-            self.write_page(&page);
-        } else {
+        if let Ok(slot_no) = page.insert_tuple(row.clone()) {
             // row fits into existing page
             self.write_page(&page);
+            Ok((last_page_no as usize, slot_no))
+        } else {
+            // not enough space → create new page
+            let mut page = self.append_page();
+            let slot_no = page.insert_tuple(row).map_err(|e| e.to_string())?;
+            let new_page_no = page_count;
+            self.write_page(&page);
+            Ok((new_page_no as usize, slot_no))
         }
-
-        Ok(())
     }
 
     /// Scan all rows from all pages, decoding tuples using the provided schema

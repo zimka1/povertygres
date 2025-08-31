@@ -18,15 +18,17 @@ insert into users values (1, "Alice", true);
 insert into users values (2, "Bob", false);
 insert into users(id, name) values (3, "Charlie");
 
-select * from users;
-
 insert into orders values (1, 1, 100);
 insert into orders values (2, 1, 200);
 insert into orders values (3, 2, 150);
 
-select id, name from users where active = true;
-
 update users set active = true where id = 2;
+update users set name = "Alicia" where id = 1;
+update orders set amount = 250 where id = 2;
+update users set active = false, name = "Charles" where id = 3;
+
+select * from users;
+select * from orders;
 
 delete from users where id = 3;
 
@@ -39,4 +41,4 @@ from users as u
 left join orders as o on u.id = o.user_id;
 
 create index users_id_name_idx on users(id, name);
-select * from users where id = 1 and name = "Alice";
+select * from users where id = 1 and name = "Alicia";

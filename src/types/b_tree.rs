@@ -38,6 +38,15 @@ impl BTreeIndex {
         false
     }
 
+    pub fn remove(&mut self, key: &Vec<Value>, pos: (usize, usize)) {
+        if let Some(entries) = self.map.get_mut(key) {
+            entries.retain(|p| p != &pos);
+            if entries.is_empty() {
+                self.map.remove(key);
+            }
+        }
+    }
+
     pub fn search_prefix(&self, prefix: &IndexKey) -> Vec<(usize, usize)> {
         let mut res = Vec::new();
         for (k, v) in &self.map {

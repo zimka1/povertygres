@@ -185,7 +185,25 @@ impl Database {
         let row = Row {
             values: final_values,
         };
-        table.heap.insert_row(row)?;
+
+        let (page_no, slot_no) = table.heap.insert_row(row.clone())?;
+
+        // Update all indexes for this table
+        for idx in self.indexes.values_mut() {
+            if idx.table == table_name {
+                let mut key = Vec::new();
+                for col in &idx.columns {
+                    let col_idx = table
+                        .columns
+                        .iter()
+                        .position(|c| c.name == *col)
+                        .ok_or_else(|| format!("Index column '{}' not found in '{}'", col, table_name))?;
+                    key.push(row.values[col_idx].clone());
+                }
+                idx.insert(key, (page_no, slot_no));
+            }
+        }
+
         Ok(())
     }
 }

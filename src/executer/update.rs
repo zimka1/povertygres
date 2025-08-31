@@ -1,7 +1,7 @@
 use super::filter::eval_condition;
 use crate::executer::join::JoinTableColumn;
 use crate::types::parser_types::Condition;
-use crate::types::storage_types::{Column, Database};
+use crate::types::storage_types::{Column, Database, Table};
 use crate::types::storage_types::{ColumnType, Value};
 use std::collections::HashMap;
 
@@ -29,6 +29,85 @@ fn normalize_col<'a>(name: &'a str, table_name: &str) -> Result<&'a str, String>
     } else {
         Ok(name)
     }
+}
+
+fn build_key(
+    index_columns: &Vec<String>,
+    table_columns: &Vec<Column>,
+    values: &Vec<Value>,
+    table_name: &str,
+) -> Result<Vec<Value>, String> {
+    let mut key = Vec::new();
+    for col in index_columns {
+        let col_idx = table_columns
+            .iter()
+            .position(|c| c.name == *col)
+            .ok_or_else(|| format!("Index column '{}' not found in '{}'", col, table_name))?;
+        key.push(values[col_idx].clone());
+    }
+    Ok(key)
+}
+
+fn validate_foreign_keys(
+    db: &Database,
+    table: &Table,
+    row_values: &Vec<Value>,
+) -> Result<(), String> {
+    for fk in &table.foreign_keys {
+        let mut local_values = Vec::new();
+        for col_name in &fk.local_columns {
+            let Some(idx) = table.columns.iter().position(|c| c.name == *col_name) else {
+                return Err(format!(
+                    "Foreign key error: local column '{}' not found in '{}'",
+                    col_name, table.name
+                ));
+            };
+            local_values.push(row_values[idx].clone());
+        }
+
+        if local_values.iter().all(|v| matches!(v, Value::Null)) {
+            continue; // все NULL — пропускаем
+        }
+
+        let parent_table = db.tables.get(&fk.referenced_table).ok_or_else(|| {
+            format!(
+                "Foreign key error: referenced table '{}' not found",
+                fk.referenced_table
+            )
+        })?;
+
+        let mut ref_indices = Vec::new();
+        for ref_col in &fk.referenced_columns {
+            let Some(idx) = parent_table.columns.iter().position(|c| c.name == *ref_col) else {
+                return Err(format!(
+                    "Foreign key error: referenced column '{}' not found in '{}'",
+                    ref_col, fk.referenced_table
+                ));
+            };
+            ref_indices.push(idx);
+        }
+
+        let parent_rows = parent_table.heap.scan_all(&parent_table.columns);
+        let mut found = false;
+        for prow in parent_rows {
+            if local_values
+                .iter()
+                .zip(ref_indices.iter())
+                .all(|(lv, ri)| &prow.values[*ri] == lv)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            return Err(format!(
+                "violates foreign key constraint: {:?} -> {}({:?})",
+                fk.local_columns, fk.referenced_table, fk.referenced_columns
+            ));
+        }
+    }
+    Ok(())
 }
 
 impl Database {
@@ -117,6 +196,8 @@ impl Database {
                     continue;
                 }
             }
+            
+            let original_row = row.values.clone();
 
             // Write new values into row
             for (idx, val) in &targets {
@@ -124,60 +205,16 @@ impl Database {
             }
 
             // Foreign key validation for updated row
-            for fk in &table.foreign_keys {
-                let mut local_values = Vec::new();
-                for col_name in &fk.local_columns {
-                    let Some(idx) = table.columns.iter().position(|c| c.name == *col_name) else {
-                        return Err(format!(
-                            "Foreign key error: local column '{}' not found in '{}'",
-                            col_name, table.name
-                        ));
-                    };
-                    local_values.push(row.values[idx].clone());
-                }
+            validate_foreign_keys(self, table, &row.values)?;
 
-                // Skip check if all FK columns are NULL
-                if local_values.iter().all(|v| matches!(v, Value::Null)) {
-                    continue;
-                }
-
-                let parent_table = self.tables.get(&fk.referenced_table).ok_or_else(|| {
-                    format!(
-                        "Foreign key error: referenced table '{}' not found",
-                        fk.referenced_table
-                    )
-                })?;
-
-                let mut ref_indices = Vec::new();
-                for ref_col in &fk.referenced_columns {
-                    let Some(idx) = parent_table.columns.iter().position(|c| c.name == *ref_col)
-                    else {
-                        return Err(format!(
-                            "Foreign key error: referenced column '{}' not found in '{}'",
-                            ref_col, fk.referenced_table
-                        ));
-                    };
-                    ref_indices.push(idx);
-                }
-
-                let parent_rows = parent_table.heap.scan_all(&parent_table.columns);
-                let mut found = false;
-                for prow in parent_rows {
-                    if local_values
-                        .iter()
-                        .zip(ref_indices.iter())
-                        .all(|(lv, ri)| &prow.values[*ri] == lv)
-                    {
-                        found = true;
-                        break;
+            for idx in self.indexes.values_mut() {
+                if idx.table == table.name {
+                    let old_key = build_key(&idx.columns, &table.columns, &original_row, &table.name)?;
+                    let new_key = build_key(&idx.columns, &table.columns, &row.values, &table.name)?;
+                    if old_key != new_key {
+                        idx.remove(&old_key, (page_no as usize, slot_no));
+                        idx.insert(new_key, (page_no as usize, slot_no));
                     }
-                }
-
-                if !found {
-                    return Err(format!(
-                        "update on table '{}' violates foreign key constraint: {:?} -> {}({:?})",
-                        table.name, fk.local_columns, fk.referenced_table, fk.referenced_columns
-                    ));
                 }
             }
 
