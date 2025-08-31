@@ -1,12 +1,18 @@
-use povertygres::parser::main_parser::parse_query;
-use povertygres::types::parser_types::{Condition, Query, Operand};
+use povertygres::parser::main::parse_query;
 use povertygres::types::filter_types::CmpOp;
+use povertygres::types::parser_types::{Condition, Operand, Query};
 use povertygres::types::storage_types::Value;
 
 #[test]
 fn test_update_basic() {
     let q = parse_query(r#"update users set name = "alice""#).unwrap();
-    if let Query::Update { table_name, column_names, values, filter } = q {
+    if let Query::Update {
+        table_name,
+        column_names,
+        values,
+        filter,
+    } = q
+    {
         assert_eq!(table_name, "users");
         assert_eq!(column_names, vec!["name"]);
         assert_eq!(values, vec![Value::Text("alice".to_string())]);
@@ -19,7 +25,12 @@ fn test_update_basic() {
 #[test]
 fn test_update_multiple_columns() {
     let q = parse_query(r#"update users set age = 20, active = true"#).unwrap();
-    if let Query::Update { column_names, values, .. } = q {
+    if let Query::Update {
+        column_names,
+        values,
+        ..
+    } = q
+    {
         assert_eq!(column_names, vec!["age", "active"]);
         assert_eq!(values, vec![Value::Int(20), Value::Bool(true)]);
     }
@@ -28,7 +39,12 @@ fn test_update_multiple_columns() {
 #[test]
 fn test_update_with_null() {
     let q = parse_query(r#"update users set nickname = null"#).unwrap();
-    if let Query::Update { column_names, values, .. } = q {
+    if let Query::Update {
+        column_names,
+        values,
+        ..
+    } = q
+    {
         assert_eq!(column_names, vec!["nickname"]);
         assert_eq!(values, vec![Value::Null]);
     }

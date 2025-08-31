@@ -1,13 +1,12 @@
 use crate::catalog::catalog_manager::CatalogManager;
 use crate::consts::catalog_consts::DATA_DIR;
 use crate::errors::engine_error::EngineError;
-use crate::page::heap_file::{HeapFile};
+use crate::storage::heap_file::HeapFile;
 use crate::types::catalog_types::{CatColumnType, ColumnMeta};
-use crate::types::storage_types::{ColumnType, ForeignKeyConstraint};
 use crate::types::storage_types::{Column, Database, Table};
+use crate::types::storage_types::{ColumnType, ForeignKeyConstraint};
 
 use std::path::{Path, PathBuf};
-
 
 pub struct Engine {
     pub db: Database,
@@ -30,7 +29,7 @@ impl Engine {
                         CatColumnType::Bool => ColumnType::Bool,
                     },
                     not_null: c.not_null,
-                    default: c.default.clone()
+                    default: c.default.clone(),
                 })
                 .collect();
             db.tables.insert(
@@ -38,7 +37,6 @@ impl Engine {
                 Table {
                     name: name.clone(),
                     columns: cols,
-                    rows: Vec::new(),
                     heap: HeapFile {
                         path: PathBuf::from(&tm.file),
                     },
@@ -55,7 +53,7 @@ impl Engine {
         name: &str,
         columns: Vec<Column>,
         primary_key: Option<String>,
-        foreign_keys: Vec<ForeignKeyConstraint>
+        foreign_keys: Vec<ForeignKeyConstraint>,
     ) -> Result<(), EngineError> {
         let cols_meta: Vec<ColumnMeta> = columns
             .iter()
@@ -69,19 +67,25 @@ impl Engine {
                     name: col.name.clone(),
                     ty,
                     not_null: col.not_null,
-                    default: col.default.clone()
+                    default: col.default.clone(),
                 }
             })
             .collect();
 
-        self.cat.create_table(name, cols_meta, primary_key.clone(), foreign_keys.clone())?;
+        self.cat
+            .create_table(name, cols_meta, primary_key.clone(), foreign_keys.clone())?;
 
         let file_path = format!("{DATA_DIR}/{name}.tbl");
 
         let heap_file = HeapFile::new(file_path.as_str());
 
-        self.db
-            .create_table(&name.to_string(), columns, heap_file, primary_key, foreign_keys)?;
+        self.db.create_table(
+            &name.to_string(),
+            columns,
+            heap_file,
+            primary_key,
+            foreign_keys,
+        )?;
 
         Ok(())
     }

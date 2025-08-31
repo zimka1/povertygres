@@ -12,7 +12,7 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
             table_name,
             columns,
             primary_key,
-            foreign_keys
+            foreign_keys,
         } => engine.create_table_in_both(&table_name, columns, primary_key, foreign_keys)?,
 
         // INSERT INTO table (...) VALUES (...)
@@ -70,6 +70,12 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
         } => engine
             .db
             .update(&table_name, column_names, values, filter)?,
+
+        Query::CreateIndex {
+            index_name,
+            table_name,
+            column_names,
+        } => {}
     };
 
     Ok(())

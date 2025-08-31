@@ -4,11 +4,11 @@ use crate::types::page_types::PageHeader;
 impl PageHeader {
     pub fn new(page_no: u32) -> Self {
         Self {
-            page_no,                       // page number in file
-            slot_count: 0,                 // number of item slots
+            page_no,                             // page number in file
+            slot_count: 0,                       // number of item slots
             free_start: PAGE_HEADER_SIZE as u16, // beginning of free space
-            free_end: PAGE_SIZE as u16,    // end of free space
-            checksum: 0,                   // checksum (not computed yet)
+            free_end: PAGE_SIZE as u16,          // end of free space
+            checksum: 0,                         // checksum (not computed yet)
         }
     }
 

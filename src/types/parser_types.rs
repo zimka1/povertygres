@@ -30,14 +30,19 @@ pub enum Query {
     /// DELETE FROM table
     Delete {
         table_name: String,
-        filter: Option<Condition>,        // Optional WHERE clause condition
+        filter: Option<Condition>, // Optional WHERE clause condition
     },
     /// UPDATE table SET col = val ...
     Update {
         table_name: String,
-        column_names: Vec<String>,        // Target columns to update
-        values: Vec<Value>,               // New values for those columns
-        filter: Option<Condition>,        // Optional WHERE clause condition
+        column_names: Vec<String>, // Target columns to update
+        values: Vec<Value>,        // New values for those columns
+        filter: Option<Condition>, // Optional WHERE clause condition
+    },
+    CreateIndex {
+        index_name: String,
+        table_name: String,
+        column_names: Vec<String>,
     },
 }
 
@@ -49,7 +54,7 @@ pub enum Operand {
 
 #[derive(Debug, Clone)]
 pub enum Condition {
-    Cmp(CmpOp, Operand, Operand),      // Comparison operation
+    Cmp(CmpOp, Operand, Operand),        // Comparison operation
     And(Box<Condition>, Box<Condition>), // Logical AND
     Or(Box<Condition>, Box<Condition>),  // Logical OR
     Not(Box<Condition>),                 // Logical NOT

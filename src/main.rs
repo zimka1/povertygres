@@ -4,15 +4,15 @@ mod consts;
 mod engine;
 mod errors;
 mod executer;
-mod page;
 mod parser;
+mod storage;
 mod types;
 
-use std::env;
-use std::fs;
 use crate::engine::Engine;
 use crate::executer::executer::execute;
-use crate::parser::main_parser::parse_query;
+use crate::parser::main::parse_query;
+use std::env;
+use std::fs;
 
 fn main() {
     let mut engine = Engine::open().expect("catalog init failed");
@@ -24,7 +24,9 @@ fn main() {
         let contents = fs::read_to_string(filename).expect("Failed to read file");
         for stmt in contents.split(';') {
             let stmt = stmt.trim();
-            if stmt.is_empty() { continue; }
+            if stmt.is_empty() {
+                continue;
+            }
             match parse_query(stmt) {
                 Ok(ast) => {
                     if let Err(err) = execute(&mut engine, ast) {

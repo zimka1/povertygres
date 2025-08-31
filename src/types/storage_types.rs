@@ -1,6 +1,6 @@
-use crate::page::heap_file::HeapFile;
-use serde::{Deserialize, Serialize};
 use super::catalog_types::CatColumnType;
+use crate::storage::heap_file::HeapFile;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -25,7 +25,6 @@ pub struct Table {
     // List of columns in the table
     pub columns: Vec<Column>,
     // Stored rows in the table
-    pub rows: Vec<Row>,
     // Low-level heap file storage for rows
     pub heap: HeapFile,
     // Optional primary key column name
@@ -43,7 +42,7 @@ pub struct Column {
     // Whether the column is NOT NULL
     pub not_null: bool,
     // Optional default value for this column
-    pub default: Option<Value>
+    pub default: Option<Value>,
 }
 
 // Supported data types for columns
@@ -130,5 +129,5 @@ pub struct ForeignKeyConstraint {
     // Name of the referenced (parent) table
     pub referenced_table: String,
     // Columns in the referenced table that are targeted
-    pub referenced_columns: Vec<String>
+    pub referenced_columns: Vec<String>,
 }

@@ -126,7 +126,7 @@ impl HeapFile {
         let mut rows = Vec::new();
         let metadata = std::fs::metadata(&self.path).expect("metadata failed");
         let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
-    
+
         for page_no in 0..page_count {
             let page = self.read_page(page_no);
             for slot_no in 0..page.header.slot_count {
@@ -136,7 +136,7 @@ impl HeapFile {
             }
         }
         rows
-    }    
+    }
 
     pub fn delete_at(&self, page_no: u32, slot_no: usize) -> Result<(), String> {
         let mut page = self.read_page(page_no);

@@ -15,7 +15,9 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
 
     // Extract column definitions between parentheses
     let rest = &after_prefix[paren_index + 1..];
-    let close_index = rest.rfind(')').ok_or("Missing closing ')' in create table")?;
+    let close_index = rest
+        .rfind(')')
+        .ok_or("Missing closing ')' in create table")?;
     let inside_parens = &rest[..close_index].trim();
     let column_defs: Vec<&str> = inside_parens.split(',').collect();
 
@@ -45,13 +47,13 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
         if tokens[0].eq_ignore_ascii_case("foreign") {
             if tokens.len() >= 5 && tokens[1].eq_ignore_ascii_case("key") {
                 let local_col = tokens[2].trim_matches(|c| c == '(' || c == ')');
-        
+
                 if !tokens[3].eq_ignore_ascii_case("references") {
                     return Err("Expected 'references' after FOREIGN KEY".into());
                 }
-        
+
                 let ref_table_token = tokens[4];
-        
+
                 let (ref_table, ref_col) = if ref_table_token.contains('(') {
                     match (ref_table_token.find('('), ref_table_token.find(')')) {
                         (Some(open), Some(close)) if close > open => {
@@ -75,7 +77,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                         .ok_or("Missing referenced column")?;
                     (ref_table, ref_col)
                 };
-        
+
                 foreign_keys.push(ForeignKeyConstraint {
                     local_columns: vec![local_col.to_string()],
                     referenced_table: ref_table.to_string(),
@@ -86,7 +88,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                 return Err("Invalid FOREIGN KEY syntax".into());
             }
         }
-        
+
         let name = tokens[0];
         let type_str = tokens.get(1).ok_or("Missing column type")?;
 
@@ -113,14 +115,14 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                     primary_key = Some(name.to_string());
                     not_null = true; // PK always NOT NULL
                     i += 2;
-                },
+                }
                 // Handle column-level REFERENCES constraint
                 "references" if i + 1 < tokens.len() => {
                     let ref_token = tokens[i + 1];
                     if let Some(open) = ref_token.find('(') {
                         let close = ref_token.find(')').ok_or("Invalid REFERENCES syntax")?;
                         let ref_table = &ref_token[..open];
-                        let ref_col = &ref_token[open+1..close];
+                        let ref_col = &ref_token[open + 1..close];
                         foreign_keys.push(ForeignKeyConstraint {
                             local_columns: vec![name.to_string()],
                             referenced_table: ref_table.trim().to_string(),
@@ -129,7 +131,8 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                         i += 2;
                     } else {
                         let ref_table = tokens[i + 1];
-                        let ref_col = tokens.get(i + 2)
+                        let ref_col = tokens
+                            .get(i + 2)
                             .ok_or("Missing column in REFERENCES")?
                             .trim_matches(|c| c == '(' || c == ')');
                         foreign_keys.push(ForeignKeyConstraint {
@@ -139,7 +142,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
                         });
                         i += 3;
                     }
-                },
+                }
                 // Handle DEFAULT values
                 "default" if i + 1 < tokens.len() => {
                     let val_str = tokens[i + 1];
@@ -167,7 +170,7 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
             name: name.to_string(),
             column_type,
             not_null,
-            default
+            default,
         });
     }
 
@@ -175,6 +178,6 @@ pub fn parse_create_table(input: &str) -> Result<Query, String> {
         table_name: table_name.to_string(),
         columns,
         primary_key,
-        foreign_keys
+        foreign_keys,
     })
 }

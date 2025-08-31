@@ -84,10 +84,7 @@ impl Database {
                 if let Some(def) = &column.default {
                     final_values[i] = def.clone();
                 } else if column.not_null {
-                    return Err(format!(
-                        "Column '{}' cannot be NULL",
-                        column.name
-                    ));
+                    return Err(format!("Column '{}' cannot be NULL", column.name));
                 }
             }
         }
@@ -119,7 +116,10 @@ impl Database {
             let mut local_values = Vec::new();
             for col_name in &fk.local_columns {
                 let Some(idx) = table.columns.iter().position(|c| c.name == *col_name) else {
-                    return Err(format!("Foreign key error: local column '{}' not found in '{}'", col_name, table.name));
+                    return Err(format!(
+                        "Foreign key error: local column '{}' not found in '{}'",
+                        col_name, table.name
+                    ));
                 };
                 local_values.push(final_values[idx].clone());
             }
@@ -127,11 +127,13 @@ impl Database {
                 continue;
             }
 
-            let parent_table = self
-                .tables
-                .get(&fk.referenced_table)
-                .ok_or_else(|| format!("Foreign key error: referenced table '{}' not found", fk.referenced_table))?;
-            
+            let parent_table = self.tables.get(&fk.referenced_table).ok_or_else(|| {
+                format!(
+                    "Foreign key error: referenced table '{}' not found",
+                    fk.referenced_table
+                )
+            })?;
+
             let mut ref_indices = Vec::new();
             for ref_col in &fk.referenced_columns {
                 let Some(idx) = parent_table.columns.iter().position(|c| c.name == *ref_col) else {

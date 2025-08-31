@@ -1,7 +1,7 @@
 use crate::errors::engine_error::EngineError;
-use crate::page::heap_file::HeapFile;
-use crate::types::storage_types::{Database, ForeignKeyConstraint};
+use crate::storage::heap_file::HeapFile;
 use crate::types::storage_types::{Column, Table};
+use crate::types::storage_types::{Database, ForeignKeyConstraint};
 
 impl Database {
     // Adds a new table to the database
@@ -11,7 +11,7 @@ impl Database {
         columns: Vec<Column>,
         heap_file: HeapFile,
         primary_key: Option<String>,
-        foreign_keys: Vec<ForeignKeyConstraint>
+        foreign_keys: Vec<ForeignKeyConstraint>,
     ) -> Result<(), EngineError> {
         // Check if table already exists
         if self.tables.contains_key(name) {
@@ -24,10 +24,9 @@ impl Database {
         let table = Table {
             name: name.to_string(),
             columns,
-            rows: Vec::new(),
             heap: heap_file,
             primary_key,
-            foreign_keys
+            foreign_keys,
         };
 
         // Insert table into database

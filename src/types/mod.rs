@@ -1,3 +1,4 @@
+pub mod b_tree;
 pub mod catalog_types;
 pub mod filter_types;
 pub mod page_types;

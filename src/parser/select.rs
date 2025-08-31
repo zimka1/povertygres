@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::where_parser::parse_where;
+use super::r#where::parse_where;
 use crate::types::parser_types::{Condition, FromItem, JoinKind, Query};
 
 /// Parse a SELECT query into a Query::Select AST node

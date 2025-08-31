@@ -1,14 +1,26 @@
+use povertygres::parser::main::parse_query;
 use povertygres::types::parser_types::Query;
 use povertygres::types::storage_types::Value;
-use povertygres::parser::main_parser::parse_query;
 
 #[test]
 fn test_insert_basic() {
     let query = parse_query(r#"insert into users values (1, "alice", true)"#).unwrap();
-    if let Query::Insert { table_name, column_names, values } = query {
+    if let Query::Insert {
+        table_name,
+        column_names,
+        values,
+    } = query
+    {
         assert_eq!(table_name, "users");
         assert!(column_names.is_none());
-        assert_eq!(values, vec![Value::Int(1), Value::Text("alice".to_string()), Value::Bool(true)]);
+        assert_eq!(
+            values,
+            vec![
+                Value::Int(1),
+                Value::Text("alice".to_string()),
+                Value::Bool(true)
+            ]
+        );
     } else {
         panic!("Unexpected query variant");
     }
@@ -17,9 +29,17 @@ fn test_insert_basic() {
 #[test]
 fn test_insert_with_columns() {
     let query = parse_query(r#"insert into users(id, name) values (2, "bob")"#).unwrap();
-    if let Query::Insert { table_name, column_names, values } = query {
+    if let Query::Insert {
+        table_name,
+        column_names,
+        values,
+    } = query
+    {
         assert_eq!(table_name, "users");
-        assert_eq!(column_names, Some(vec!["id".to_string(), "name".to_string()]));
+        assert_eq!(
+            column_names,
+            Some(vec!["id".to_string(), "name".to_string()])
+        );
         assert_eq!(values, vec![Value::Int(2), Value::Text("bob".to_string())]);
     }
 }
@@ -28,7 +48,10 @@ fn test_insert_with_columns() {
 fn test_insert_with_null_and_bool() {
     let query = parse_query("insert into users values (null, true, false)").unwrap();
     if let Query::Insert { values, .. } = query {
-        assert_eq!(values, vec![Value::Null, Value::Bool(true), Value::Bool(false)]);
+        assert_eq!(
+            values,
+            vec![Value::Null, Value::Bool(true), Value::Bool(false)]
+        );
     }
 }
 

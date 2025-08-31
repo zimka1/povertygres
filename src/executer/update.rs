@@ -135,22 +135,23 @@ impl Database {
                     };
                     local_values.push(row.values[idx].clone());
                 }
-            
+
                 // Skip check if all FK columns are NULL
                 if local_values.iter().all(|v| matches!(v, Value::Null)) {
                     continue;
                 }
-            
+
                 let parent_table = self.tables.get(&fk.referenced_table).ok_or_else(|| {
                     format!(
                         "Foreign key error: referenced table '{}' not found",
                         fk.referenced_table
                     )
                 })?;
-            
+
                 let mut ref_indices = Vec::new();
                 for ref_col in &fk.referenced_columns {
-                    let Some(idx) = parent_table.columns.iter().position(|c| c.name == *ref_col) else {
+                    let Some(idx) = parent_table.columns.iter().position(|c| c.name == *ref_col)
+                    else {
                         return Err(format!(
                             "Foreign key error: referenced column '{}' not found in '{}'",
                             ref_col, fk.referenced_table
@@ -158,7 +159,7 @@ impl Database {
                     };
                     ref_indices.push(idx);
                 }
-            
+
                 let parent_rows = parent_table.heap.scan_all(&parent_table.columns);
                 let mut found = false;
                 for prow in parent_rows {
@@ -171,7 +172,7 @@ impl Database {
                         break;
                     }
                 }
-            
+
                 if !found {
                     return Err(format!(
                         "update on table '{}' violates foreign key constraint: {:?} -> {}({:?})",
@@ -179,7 +180,7 @@ impl Database {
                     ));
                 }
             }
-            
+
             // If all checks pass, write updated row back to storage
             table.heap.update_row(page_no, slot_no, row)?;
         }

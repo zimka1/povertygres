@@ -1,7 +1,8 @@
-mod create_parser;
-mod delete_parser;
-mod insert_parser;
-pub mod main_parser;
-mod select_parser;
-mod update_parser;
-pub mod where_parser;
+mod create;
+mod delete;
+mod index;
+mod insert;
+pub mod main;
+mod select;
+mod update;
+pub mod r#where;

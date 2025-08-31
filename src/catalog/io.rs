@@ -37,14 +37,14 @@ pub fn load_or_create_catalog(data_dir: &Path) -> Result<Catalog, CatalogError> 
 
 pub fn save_catalog_atomic(data_dir: &Path, cat: &Catalog) -> Result<(), CatalogError> {
     let json = serde_json::to_string_pretty(cat)?; // serialize catalog
-    fs::create_dir_all(data_dir)?;                 // ensure dir exists
+    fs::create_dir_all(data_dir)?; // ensure dir exists
 
     // write to temp file for atomic replace
     let tmp = NamedTempFile::new_in(data_dir)?;
     {
         let mut f = tmp.as_file();
         f.write_all(json.as_bytes())?; // write json
-        f.sync_all()?;                 // flush data
+        f.sync_all()?; // flush data
     }
 
     // move temp file into final path

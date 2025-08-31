@@ -17,19 +17,6 @@ impl Database {
     /// Deletes rows from `table_name` that match `filter`.
     /// Returns the number of deleted rows.
     pub fn delete(&mut self, table_name: &str, filter: Option<Condition>) -> Result<usize, String> {
-        // Find the target table mutably (needed for deletions)
-        let table = self
-            .tables
-            .get_mut(table_name)
-            .ok_or_else(|| format!("Table '{}' doesn't exist", table_name))?;
-
-        // If no filter: remove all rows (unsafe, bypasses FK checks)
-        if filter.is_none() {
-            let n = table.rows.len();
-            table.rows.clear();
-            return Ok(n);
-        }
-
         // Immutable borrow for scanning and metadata
         let table = self
             .tables
@@ -55,7 +42,9 @@ impl Database {
                                     // Collect referenced values from the row being deleted
                                     let mut ref_values = Vec::new();
                                     for ref_col in &fk.referenced_columns {
-                                        let Some(idx) = table.columns.iter().position(|c| c.name == *ref_col) else {
+                                        let Some(idx) =
+                                            table.columns.iter().position(|c| c.name == *ref_col)
+                                        else {
                                             return Err(format!(
                                                 "Foreign key error: column '{}' not found in '{}'",
                                                 ref_col, table_name
@@ -65,11 +54,18 @@ impl Database {
                                     }
 
                                     // Scan child table for matches
-                                    let child_rows = other_table.heap.scan_all(&other_table.columns);
+                                    let child_rows =
+                                        other_table.heap.scan_all(&other_table.columns);
                                     for child in child_rows {
                                         let mut match_all = true;
-                                        for (local_col, ref_val) in fk.local_columns.iter().zip(ref_values.iter()) {
-                                            let Some(idx) = other_table.columns.iter().position(|c| c.name == *local_col) else {
+                                        for (local_col, ref_val) in
+                                            fk.local_columns.iter().zip(ref_values.iter())
+                                        {
+                                            let Some(idx) = other_table
+                                                .columns
+                                                .iter()
+                                                .position(|c| c.name == *local_col)
+                                            else {
                                                 return Err(format!(
                                                     "Foreign key error: column '{}' not found in '{}'",
                                                     local_col, other_name
@@ -83,7 +79,11 @@ impl Database {
                                         if match_all {
                                             return Err(format!(
                                                 "delete from '{}' violates foreign key constraint in '{}': {:?} -> {}({:?})",
-                                                table_name, other_name, fk.local_columns, fk.referenced_table, fk.referenced_columns
+                                                table_name,
+                                                other_name,
+                                                fk.local_columns,
+                                                fk.referenced_table,
+                                                fk.referenced_columns
                                             ));
                                         }
                                     }

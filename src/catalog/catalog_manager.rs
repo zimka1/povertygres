@@ -52,7 +52,7 @@ impl CatalogManager {
             columns,
             next_rowid: 1, // start row id counter
             primary_key,
-            foreign_keys
+            foreign_keys,
         };
 
         // Update catalog state

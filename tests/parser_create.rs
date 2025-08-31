@@ -1,11 +1,17 @@
-use povertygres::parser::main_parser::parse_query;
+use povertygres::parser::main::parse_query;
 use povertygres::types::parser_types::Query;
 use povertygres::types::storage_types::{ColumnType, Value};
 
 #[test]
 fn test_basic_create() {
     let query = parse_query("create table users (id int, name text)").unwrap();
-    if let Query::CreateTable { table_name, columns, primary_key, foreign_keys } = query {
+    if let Query::CreateTable {
+        table_name,
+        columns,
+        primary_key,
+        foreign_keys,
+    } = query
+    {
         assert_eq!(table_name, "users");
         assert_eq!(columns.len(), 2);
         assert_eq!(columns[0].name, "id");
@@ -22,7 +28,12 @@ fn test_basic_create() {
 #[test]
 fn test_primary_key_inline() {
     let query = parse_query("create table users (id int primary key, name text)").unwrap();
-    if let Query::CreateTable { primary_key, columns, .. } = query {
+    if let Query::CreateTable {
+        primary_key,
+        columns,
+        ..
+    } = query
+    {
         assert_eq!(primary_key, Some("id".to_string()));
         assert!(columns[0].not_null); // PK всегда NOT NULL
     } else {
@@ -43,8 +54,9 @@ fn test_primary_key_table_level() {
 #[test]
 fn test_not_null_and_default() {
     let query = parse_query(
-        "create table t (a int not null default 5, b bool default true, c text default \"hi\")"
-    ).unwrap();
+        "create table t (a int not null default 5, b bool default true, c text default \"hi\")",
+    )
+    .unwrap();
     if let Query::CreateTable { columns, .. } = query {
         assert!(columns[0].not_null);
         assert_eq!(columns[0].default, Some(Value::Int(5)));
@@ -55,9 +67,8 @@ fn test_not_null_and_default() {
 
 #[test]
 fn test_foreign_key_inline() {
-    let query = parse_query(
-        "create table orders (id int, user_id int references users(id))"
-    ).unwrap();
+    let query =
+        parse_query("create table orders (id int, user_id int references users(id))").unwrap();
     if let Query::CreateTable { foreign_keys, .. } = query {
         assert_eq!(foreign_keys.len(), 1);
         assert_eq!(foreign_keys[0].local_columns, vec!["user_id"]);
@@ -69,8 +80,9 @@ fn test_foreign_key_inline() {
 #[test]
 fn test_foreign_key_table_level() {
     let query = parse_query(
-        "create table orders (id int, user_id int, foreign key user_id references users(id))"
-    ).unwrap();
+        "create table orders (id int, user_id int, foreign key user_id references users(id))",
+    )
+    .unwrap();
     if let Query::CreateTable { foreign_keys, .. } = query {
         assert_eq!(foreign_keys.len(), 1);
         assert_eq!(foreign_keys[0].local_columns, vec!["user_id"]);

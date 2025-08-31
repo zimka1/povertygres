@@ -17,7 +17,7 @@ pub fn validate_catalog(cat: &Catalog) -> Result<(), CatalogError> {
         return Err(CatalogError::Invalid("page size mismatch".into()));
     }
 
-    let mut oids = HashSet::new();  // track unique table ids
+    let mut oids = HashSet::new(); // track unique table ids
     let mut files = HashSet::new(); // track unique table files
 
     for (name, t) in &cat.tables {

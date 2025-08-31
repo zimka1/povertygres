@@ -1,6 +1,6 @@
-use povertygres::parser::where_parser::parse_where;
-use povertygres::types::parser_types::{Condition, Operand};
+use povertygres::parser::r#where::parse_where;
 use povertygres::types::filter_types::CmpOp;
+use povertygres::types::parser_types::{Condition, Operand};
 use povertygres::types::storage_types::Value;
 
 #[test]

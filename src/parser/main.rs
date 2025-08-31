@@ -1,9 +1,8 @@
 use super::{
-    create_parser::parse_create_table, insert_parser::parse_insert, select_parser::parse_select,
-    where_parser::parse_where,
+    create::parse_create_table, insert::parse_insert, select::parse_select, r#where::parse_where,
 };
 use crate::{
-    parser::{delete_parser::parse_delete, update_parser::parse_update},
+    parser::{delete::parse_delete, index::parse_create_index, update::parse_update},
     types::parser_types::{Condition, Query},
 };
 
@@ -24,6 +23,8 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
 
     if input.to_ascii_lowercase().starts_with("create table ") {
         parse_create_table(input)
+    } else if input.to_ascii_lowercase().starts_with("create index") {
+        parse_create_index(input)
     } else if input.to_ascii_lowercase().starts_with("insert into") {
         parse_insert(input)
     } else if input.to_ascii_lowercase().starts_with("select ") {
