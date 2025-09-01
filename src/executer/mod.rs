@@ -8,3 +8,4 @@ pub mod join;
 pub mod printer;
 pub mod select;
 pub mod update;
+pub mod help_functions;

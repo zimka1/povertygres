@@ -1,3 +1,4 @@
+use crate::executer::help_functions::validate_foreign_keys;
 use crate::types::storage_types::Database;
 use crate::types::storage_types::{ColumnType, Row, Value};
 
@@ -112,68 +113,7 @@ impl Database {
         }
 
         // Foreign key validation
-        for fk in &table.foreign_keys {
-            let mut local_values = Vec::new();
-            for col_name in &fk.local_columns {
-                let Some(idx) = table.columns.iter().position(|c| c.name == *col_name) else {
-                    return Err(format!(
-                        "Foreign key error: local column '{}' not found in '{}'",
-                        col_name, table.name
-                    ));
-                };
-                local_values.push(final_values[idx].clone());
-            }
-            if local_values.iter().all(|v| matches!(v, Value::Null)) {
-                continue;
-            }
-
-            let parent_table = self.tables.get(&fk.referenced_table).ok_or_else(|| {
-                format!(
-                    "Foreign key error: referenced table '{}' not found",
-                    fk.referenced_table
-                )
-            })?;
-
-            let mut ref_indices = Vec::new();
-            for ref_col in &fk.referenced_columns {
-                let Some(idx) = parent_table.columns.iter().position(|c| c.name == *ref_col) else {
-                    return Err(format!(
-                        "Foreign key error: referenced column '{}' not found in '{}'",
-                        ref_col, fk.referenced_table
-                    ));
-                };
-                ref_indices.push(idx);
-            }
-
-            if local_values.len() != ref_indices.len() {
-                return Err(format!(
-                    "Foreign key error: column count mismatch in reference {} -> {}",
-                    table.name, fk.referenced_table
-                ));
-            }
-
-            let parent_rows = parent_table.heap.scan_all(&parent_table.columns);
-            let mut found = false;
-            for row in parent_rows {
-                let mut match_all = true;
-                for (lv, &ri) in local_values.iter().zip(&ref_indices) {
-                    if &row.values[ri] != lv {
-                        match_all = false;
-                        break;
-                    }
-                }
-                if match_all {
-                    found = true;
-                    break;
-                }
-            }
-            if !found {
-                return Err(format!(
-                    "insert or update on table '{}' violates foreign key constraint: {:?} -> {}({:?})",
-                    table.name, fk.local_columns, fk.referenced_table, fk.referenced_columns
-                ));
-            }
-        }
+        validate_foreign_keys(self, table, &final_values)?;
 
         // Now reopen table mutably to perform the actual insert
         let table = self
