@@ -57,6 +57,7 @@ fn find_idx(meta: &[JoinTableColumn], name: &str) -> Result<usize, String> {
     }
 }
 
+/// Try to extract equality conditions (col = value, possibly with AND)
 fn extract_eq_conditions(cond: &Condition) -> Option<Vec<(String, Value)>> {
     match cond {
         Condition::Cmp(CmpOp::Eq, Operand::Column(c), Operand::Literal(v)) => {
@@ -80,6 +81,7 @@ fn extract_eq_conditions(cond: &Condition) -> Option<Vec<(String, Value)>> {
     }
 }
 
+/// Try to extract simple range conditions (col > v, col >= v, col < v, col <= v)
 fn extract_range_condition(cond: &Condition) -> Option<(String, Bound<Vec<Value>>, Bound<Vec<Value>>)> {
     match cond {
         Condition::Cmp(op, Operand::Column(c), Operand::Literal(v)) => {
@@ -97,11 +99,14 @@ fn extract_range_condition(cond: &Condition) -> Option<(String, Bound<Vec<Value>
 }
 
 impl Database {
+    /// Attempt to fetch rows using an index if possible.
+    /// Supports equality lookups and simple range scans.
     fn try_index_lookup(
         &self,
         table: &Table,
         filter: &Option<Condition>,
     ) -> Result<Option<Vec<Row>>, String> {
+        // Case 1: equality conditions
         if let Some(cols_vals) = filter.as_ref().and_then(|c| extract_eq_conditions(c)) {
             let filter_cols: Vec<String> = cols_vals.iter().map(|(c, _)| c.clone()).collect();
     
@@ -122,6 +127,8 @@ impl Database {
                 }
             }
         }
+
+        // Case 2: range condition
         if let Some((col, lower, upper)) = filter.as_ref().and_then(|c| extract_range_condition(c)) {
             for idx in self.indexes.values() {
                 if idx.table == table.name && idx.columns.len() == 1 && idx.columns[0] == col {
@@ -136,10 +143,11 @@ impl Database {
                 }
             }
         }        
+
+        // No suitable index found
         Ok(None)
     }
     
-
     /// Execute SELECT on a single table or join
     pub fn select(
         &self,
@@ -186,6 +194,7 @@ impl Database {
 
         // Filter and project rows
         for r in &exec.rows {
+            // Apply WHERE condition if present
             if let Some(cond) = &filter {
                 let keep = eval_condition(
                     cond,
@@ -200,6 +209,7 @@ impl Database {
                 }
             }
 
+            // Project values into result set
             if is_star {
                 rows.push(Row {
                     values: r.values.clone(),
