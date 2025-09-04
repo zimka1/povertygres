@@ -77,6 +77,11 @@ impl HeapFile {
         page
     }
 
+    pub fn get_tuple(&self, page_no: u32, slot_no: usize, schema: &[Column]) -> Option<Row> {
+        let page = self.read_page(page_no);
+        page.get_tuple(slot_no, schema)
+    }
+
     pub fn insert_row(&self, row: Row) -> Result<(usize, usize), String> {
         // find last page number
         let metadata = std::fs::metadata(&self.path).map_err(|e| e.to_string())?;

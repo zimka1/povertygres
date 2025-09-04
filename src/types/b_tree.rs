@@ -1,5 +1,5 @@
 use crate::types::storage_types::Value;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::Bound};
 
 pub type IndexKey = Vec<Value>;
 
@@ -47,6 +47,18 @@ impl BTreeIndex {
         }
     }
 
+    pub fn search_range(
+        &self,
+        lower: Bound<Vec<Value>>,
+        upper: Bound<Vec<Value>>,
+    ) -> Vec<(usize, usize)> {
+        let mut res = Vec::new();
+        for (_k, v) in self.map.range((lower, upper)) {
+            res.extend(v.clone());
+        }
+        res
+    }
+    
     pub fn search_prefix(&self, prefix: &IndexKey) -> Vec<(usize, usize)> {
         let mut res = Vec::new();
         for (k, v) in &self.map {
