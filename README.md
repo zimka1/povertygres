@@ -45,6 +45,16 @@ Goal: implement core PostgreSQL architecture and algorithms.
   * [x] `INNER JOIN` with `ON` conditions
   * [x] `LEFT JOIN` with `NULL` fill for unmatched rows
 
+* [x] Indexes
+  * [x] `CREATE INDEX` (single and composite keys)
+  * [x] `BTreeIndex` structure backed by `BTreeMap`
+  * [x] Index maintenance on `INSERT`, `UPDATE`, `DELETE`
+  * [x] Index-based lookup for `SELECT`:
+    * [x] Equality lookups (`col = value`, composite `col1 = v1 AND col2 = v2`)
+    * [x] Range scans (`<`, `<=`, `>`, `>=`)
+  * [x] Fallback to full table scan when no usable index is found
+
+
 
 ---
 
@@ -79,13 +89,6 @@ Goal: implement core PostgreSQL architecture and algorithms.
 - [ ] Plan rewriting rules
 - [ ] Index usage decision
 - [ ] Join ordering strategies
-
----
-
-## Indexes
-- [ ] `CREATE INDEX` syntax
-- [ ] B-Tree index (single column)
-- [ ] Index scan operator
 
 ---
 
