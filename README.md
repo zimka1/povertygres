@@ -54,7 +54,15 @@ Goal: implement core PostgreSQL architecture and algorithms.
     * [x] Range scans (`<`, `<=`, `>`, `>=`)
   * [x] Fallback to full table scan when no usable index is found
 
-
+* [x] MVCC (multi-version concurrency control)
+  * [x] `xmin` / `xmax` in `TupleHeader`
+  * [x] `TransactionManager` assigns XIDs and tracks commit/rollback
+  * [x] Visibility rules (`is_visible(xid, tm)`)
+  * [x] `INSERT`: new tuple gets `xmin = xid`, visible only after commit
+  * [x] `DELETE`: sets `xmax = xid` instead of physical removal
+  * [x] `UPDATE`: old tuple gets `xmax = xid`, new version inserted with `xmin = xid`
+  * [x] Rollback discards uncommitted versions
+  * [x] Joins and scans return only visible versions (old + new until vacuum)
 
 ---
 
