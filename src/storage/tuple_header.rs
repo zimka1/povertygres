@@ -1,36 +1,62 @@
-use crate::types::page_types::{NullBitmap, TupleHeader};
+use crate::types::{
+    page_types::{NullBitmap, TupleHeader},
+    transaction_types::{TransactionManager, TxStatus},
+};
 use std::convert::TryInto;
 
 impl TupleHeader {
+    pub fn is_visible(&self, cur_xid: u32, tm: &TransactionManager) -> bool {
+        match tm.status(self.xmin) {
+            TxStatus::Committed => match self.xmax {
+                None => true,
+                Some(x) => match tm.status(x) {
+                    TxStatus::InProgress => x == cur_xid,
+                    TxStatus::Committed => false,
+                    TxStatus::Aborted => true,
+                },
+            },
+            TxStatus::InProgress => self.xmin == cur_xid,
+            TxStatus::Aborted => false,
+        }
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-
-        // transaction id (xmin)
+    
+        // xmin
         buf.extend_from_slice(&self.xmin.to_le_bytes());
-
-        // length of null bitmap (u16)
+    
+        // xmax (0 means None)
+        buf.extend_from_slice(&self.xmax.unwrap_or(0).to_le_bytes());
+    
+        // length of null bitmap
         let null_len = self.nullmap_bytes.size() as u16;
         buf.extend_from_slice(&null_len.to_le_bytes());
-
-        // raw null bitmap bytes
+    
+        // raw null bitmap
         buf.extend_from_slice(&self.nullmap_bytes.bytes);
-
-        // tuple flags
+    
+        // flags
         buf.extend_from_slice(&self.flags.to_le_bytes());
-
+    
         buf
     }
+    
 
     pub fn from_bytes(buf: &[u8], column_count: usize) -> Self {
         // read xmin
         let xmin = u32::from_le_bytes(buf[0..4].try_into().unwrap());
 
+        // read xmax
+        let raw_xmax = u32::from_le_bytes(buf[4..8].try_into().unwrap());
+        let xmax = if raw_xmax == 0 { None } else { Some(raw_xmax) };
+        
         // read null bitmap length and bytes
-        let null_len = u16::from_le_bytes(buf[4..6].try_into().unwrap()) as usize;
-        let null_bytes = buf[6..6 + null_len].to_vec();
+        let null_len = u16::from_le_bytes(buf[8..10].try_into().unwrap()) as usize;
+        let null_bytes = buf[10..10 + null_len].to_vec();
 
         // read flags after nullmap
-        let flags_offset = 6 + null_len;
+        let flags_offset = 10 + null_len;
         let flags = u16::from_le_bytes(buf[flags_offset..flags_offset + 2].try_into().unwrap());
 
         // construct nullmap
@@ -41,6 +67,7 @@ impl TupleHeader {
 
         Self {
             xmin,
+            xmax,
             nullmap_bytes: nullmap,
             flags,
         }

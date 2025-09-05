@@ -5,4 +5,5 @@ pub mod errors;
 pub mod executer;
 pub mod parser;
 pub mod storage;
+pub mod transactions;
 pub mod types;

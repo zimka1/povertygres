@@ -3,6 +3,7 @@ use crate::executer::join::{JoinTable, JoinTableColumn};
 use crate::types::filter_types::CmpOp;
 use crate::types::parser_types::{Condition, Operand};
 use crate::types::storage_types::{Column, Database, Row, Table, Value};
+use crate::types::transaction_types::TransactionManager;
 use std::ops::Bound;
 
 /// Argument to SELECT: either a table name or a prebuilt JoinTable
@@ -12,7 +13,7 @@ pub enum TableArg {
 }
 
 /// Convert physical table into JoinTable with alias
-fn phys_to_join(table: &Table, alias: &str) -> JoinTable {
+fn phys_to_join(tm: &TransactionManager, table: &Table, alias: &str, xid: u32) -> JoinTable {
     let cols = table
         .columns
         .iter()
@@ -22,7 +23,11 @@ fn phys_to_join(table: &Table, alias: &str) -> JoinTable {
         })
         .collect();
 
-    let rows = table.heap.scan_all(&table.columns);
+    let rows = table.heap.scan_all(&table.columns)
+        .into_iter()
+        .filter(|(_, _, header, _)| header.is_visible(xid, tm))
+        .map(|(_, _, _, row)| row)
+        .collect();
 
     JoinTable {
         columns: cols,
@@ -82,14 +87,16 @@ fn extract_eq_conditions(cond: &Condition) -> Option<Vec<(String, Value)>> {
 }
 
 /// Try to extract simple range conditions (col > v, col >= v, col < v, col <= v)
-fn extract_range_condition(cond: &Condition) -> Option<(String, Bound<Vec<Value>>, Bound<Vec<Value>>)> {
+fn extract_range_condition(
+    cond: &Condition,
+) -> Option<(String, Bound<Vec<Value>>, Bound<Vec<Value>>)> {
     match cond {
         Condition::Cmp(op, Operand::Column(c), Operand::Literal(v)) => {
             let key = vec![v.clone()];
             match op {
-                CmpOp::Gt  => Some((c.clone(), Bound::Excluded(key.clone()), Bound::Unbounded)),
+                CmpOp::Gt => Some((c.clone(), Bound::Excluded(key.clone()), Bound::Unbounded)),
                 CmpOp::Gte => Some((c.clone(), Bound::Included(key.clone()), Bound::Unbounded)),
-                CmpOp::Lt  => Some((c.clone(), Bound::Unbounded, Bound::Excluded(key.clone()))),
+                CmpOp::Lt => Some((c.clone(), Bound::Unbounded, Bound::Excluded(key.clone()))),
                 CmpOp::Lte => Some((c.clone(), Bound::Unbounded, Bound::Included(key.clone()))),
                 _ => None,
             }
@@ -105,21 +112,26 @@ impl Database {
         &self,
         table: &Table,
         filter: &Option<Condition>,
+        xid: u32,
     ) -> Result<Option<Vec<Row>>, String> {
         // Case 1: equality conditions
         if let Some(cols_vals) = filter.as_ref().and_then(|c| extract_eq_conditions(c)) {
             let filter_cols: Vec<String> = cols_vals.iter().map(|(c, _)| c.clone()).collect();
-    
+
             for idx in self.indexes.values() {
                 if idx.table == table.name && idx.columns == filter_cols {
                     let key: Vec<Value> = cols_vals.iter().map(|(_, v)| v.clone()).collect();
                     if let Some(positions) = idx.search_eq(&key) {
                         let mut rows = Vec::new();
                         for (page_no, slot_no) in positions {
-                            if let Some(row) =
-                                table.heap.get_tuple(*page_no as u32, *slot_no, &table.columns)
+                            if let Some((header, row)) =
+                                table
+                                    .heap
+                                    .get_tuple(*page_no as u32, *slot_no, &table.columns)
                             {
-                                rows.push(row);
+                                if header.is_visible(xid, &self.transaction_manager) {
+                                    rows.push(row);
+                                }
                             }
                         }
                         return Ok(Some(rows));
@@ -129,31 +141,37 @@ impl Database {
         }
 
         // Case 2: range condition
-        if let Some((col, lower, upper)) = filter.as_ref().and_then(|c| extract_range_condition(c)) {
+        if let Some((col, lower, upper)) = filter.as_ref().and_then(|c| extract_range_condition(c))
+        {
             for idx in self.indexes.values() {
                 if idx.table == table.name && idx.columns.len() == 1 && idx.columns[0] == col {
                     let positions = idx.search_range(lower, upper);
                     let mut rows = Vec::new();
                     for (page_no, slot_no) in positions {
-                        if let Some(row) = table.heap.get_tuple(page_no as u32, slot_no, &table.columns) {
+                        if let Some((_, row)) =
+                            table
+                                .heap
+                                .get_tuple(page_no as u32, slot_no, &table.columns)
+                        {
                             rows.push(row);
                         }
                     }
                     return Ok(Some(rows));
                 }
             }
-        }        
+        }
 
         // No suitable index found
         Ok(None)
     }
-    
+
     /// Execute SELECT on a single table or join
     pub fn select(
         &self,
         table_arg: &TableArg,
         column_names: &Vec<String>,
         filter: Option<Condition>,
+        xid: u32
     ) -> Result<(Vec<JoinTableColumn>, Vec<Row>), String> {
         // 1) Normalize input into JoinTable
         let exec: JoinTable = match table_arg {
@@ -163,17 +181,21 @@ impl Database {
                     .tables
                     .get(name)
                     .ok_or_else(|| format!("Table '{}' doesn't exist", name))?;
-                if let Some(rows) = self.try_index_lookup(t, &filter)? {
-                    JoinTable { 
-                        columns: t.columns.iter().map(|c| JoinTableColumn {
-                            table_alias: name.clone(),
-                            column_name: c.name.clone(),
-                        }).collect(),
+                if let Some(rows) = self.try_index_lookup(t, &filter, xid)? {
+                    JoinTable {
+                        columns: t
+                            .columns
+                            .iter()
+                            .map(|c| JoinTableColumn {
+                                table_alias: name.clone(),
+                                column_name: c.name.clone(),
+                            })
+                            .collect(),
                         rows,
                     }
                 } else {
                     // For plain table, use its name as alias
-                    phys_to_join(t, name)
+                    phys_to_join(&self.transaction_manager,t, name, xid)
                 }
             }
         };

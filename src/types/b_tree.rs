@@ -64,7 +64,7 @@ impl BTreeIndex {
         }
         res
     }
-    
+
     /// Prefix match (useful for composite indexes)
     pub fn search_prefix(&self, prefix: &IndexKey) -> Vec<(usize, usize)> {
         let mut res = Vec::new();

@@ -1,5 +1,5 @@
+use crate::types::storage_types::{Row, Value};
 use crate::types::storage_types::{Column, Database, Table};
-use crate::types::storage_types::{Value};
 
 pub fn build_key(
     index_columns: &Vec<String>,
@@ -57,7 +57,7 @@ pub fn validate_foreign_keys(
             ref_indices.push(idx);
         }
 
-        let parent_rows = parent_table.heap.scan_all(&parent_table.columns);
+        let parent_rows: Vec<Row> = parent_table.heap.scan_all(&parent_table.columns).into_iter().map(|(_, _, _, row)| row).collect();
         let mut found = false;
         for prow in parent_rows {
             if local_values
@@ -96,8 +96,7 @@ pub fn ensure_not_referenced(
                 // соберём значения из удаляемой строки по ref_columns
                 let mut ref_values = Vec::new();
                 for ref_col in &fk.referenced_columns {
-                    let Some(idx) =
-                        table.columns.iter().position(|c| c.name == *ref_col) else {
+                    let Some(idx) = table.columns.iter().position(|c| c.name == *ref_col) else {
                         return Err(format!(
                             "Foreign key error: column '{}' not found in '{}'",
                             ref_col, table_name
@@ -106,15 +105,15 @@ pub fn ensure_not_referenced(
                     ref_values.push(row_values[idx].clone());
                 }
 
-                // сканируем детей
-                let child_rows = other_table.heap.scan_all(&other_table.columns);
+                let child_rows: Vec<Row> = other_table.heap.scan_all(&other_table.columns).into_iter().map(|(_, _, _, row)| row).collect();
                 for child in child_rows {
                     let mut match_all = true;
-                    for (local_col, ref_val) in
-                        fk.local_columns.iter().zip(ref_values.iter())
-                    {
-                        let Some(idx) =
-                            other_table.columns.iter().position(|c| c.name == *local_col) else {
+                    for (local_col, ref_val) in fk.local_columns.iter().zip(ref_values.iter()) {
+                        let Some(idx) = other_table
+                            .columns
+                            .iter()
+                            .position(|c| c.name == *local_col)
+                        else {
                             return Err(format!(
                                 "Foreign key error: column '{}' not found in '{}'",
                                 local_col, other_name

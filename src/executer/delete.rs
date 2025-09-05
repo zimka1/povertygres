@@ -17,7 +17,7 @@ fn single_meta(table_name: &str, cols: &Vec<Column>) -> Vec<JoinTableColumn> {
 impl Database {
     /// Deletes rows from `table_name` that match `filter`.
     /// Returns the number of deleted rows.
-    pub fn delete(&mut self, table_name: &str, filter: Option<Condition>) -> Result<usize, String> {
+    pub fn delete(&mut self, table_name: &str, filter: Option<Condition>, xid: u32) -> Result<usize, String> {
         // Immutable borrow for scanning and metadata
         let table = self
             .tables
@@ -28,9 +28,12 @@ impl Database {
         let metas = single_meta(table_name, &table.columns);
 
         if let Some(cond) = &filter {
-            let rows = table.heap.scan_all_with_pos(&table.columns);
+            let rows = table.heap.scan_all(&table.columns);
 
-            for (page_no, slot_no, row) in rows {
+            for (page_no, slot_no, header, row) in rows {
+                if !header.is_visible(xid, &self.transaction_manager) {
+                    continue;
+                }
                 match eval_condition(cond, &row, &metas, None, None) {
                     Ok(true) => {
                         // For each other table, check if any FK references this row
@@ -38,13 +41,18 @@ impl Database {
 
                         for idx in self.indexes.values_mut() {
                             if idx.table == table.name {
-                                let key = build_key(&idx.columns, &table.columns, &row.values, table_name)?;
+                                let key = build_key(
+                                    &idx.columns,
+                                    &table.columns,
+                                    &row.values,
+                                    table_name,
+                                )?;
                                 idx.remove(&key, (page_no as usize, slot_no));
                             }
                         }
 
                         // If all FK checks passed → delete row
-                        table.heap.delete_at(page_no, slot_no)?;
+                        table.heap.delete_at(page_no, slot_no, xid)?;
                         deleted_count += 1;
                     }
                     Ok(false) => { /* keep row */ }

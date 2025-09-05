@@ -1,4 +1,5 @@
 use crate::executer::help_functions::validate_foreign_keys;
+use crate::types::page_types::TupleHeader;
 use crate::types::storage_types::Database;
 use crate::types::storage_types::{ColumnType, Row, Value};
 
@@ -9,6 +10,7 @@ impl Database {
         table_name: &str,
         column_names: Option<Vec<String>>, // Optional: user can specify columns
         values: Vec<Value>,                // Values to insert
+        xid: u32
     ) -> Result<(), String> {
         // Get the target table (immutable for now)
         let table = self
@@ -101,13 +103,15 @@ impl Database {
                 return Err(format!("Primary key '{}' cannot be NULL", pk_name));
             }
 
-            let existing_rows = table.heap.scan_all(&table.columns);
-            for row in existing_rows {
-                if row.values[pk_idx] == *pk_val {
-                    return Err(format!(
-                        "duplicate key value violates primary key constraint on '{}'",
-                        pk_name
-                    ));
+            let existing_rows: Vec<(Row, TupleHeader)> = table.heap.scan_all(&table.columns).into_iter().map(|(_, _, header, row)| (row, header)).collect();
+            for (row, header) in existing_rows {
+                if header.is_visible(xid, &self.transaction_manager) {
+                    if row.values[pk_idx] == *pk_val {
+                        return Err(format!(
+                            "duplicate key value violates primary key constraint on '{}'",
+                            pk_name
+                        ));
+                    }
                 }
             }
         }
@@ -126,7 +130,7 @@ impl Database {
             values: final_values,
         };
 
-        let (page_no, slot_no) = table.heap.insert_row(row.clone())?;
+        let (page_no, slot_no) = table.heap.insert_row(row.clone(), xid)?;
 
         // Update all indexes for this table
         for idx in self.indexes.values_mut() {
@@ -137,7 +141,9 @@ impl Database {
                         .columns
                         .iter()
                         .position(|c| c.name == *col)
-                        .ok_or_else(|| format!("Index column '{}' not found in '{}'", col, table_name))?;
+                        .ok_or_else(|| {
+                            format!("Index column '{}' not found in '{}'", col, table_name)
+                        })?;
                     key.push(row.values[col_idx].clone());
                 }
                 idx.insert(key, (page_no, slot_no));

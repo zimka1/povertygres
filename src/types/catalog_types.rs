@@ -54,7 +54,7 @@ impl Catalog {
             page_size,
             next_table_oid: 1,
             tables: BTreeMap::new(),
-            indexes: HashMap::new()
+            indexes: HashMap::new(),
         }
     }
 

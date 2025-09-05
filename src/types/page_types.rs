@@ -24,7 +24,8 @@ pub struct ItemId {
 
 #[derive(Debug, Clone)]
 pub struct TupleHeader {
-    pub xmin: u32,                 // transaction id of inserter
+    pub xmin: u32, // transaction id of inserter
+    pub xmax: Option<u32>,
     pub nullmap_bytes: NullBitmap, // bitmap for NULL values
     pub flags: u16,                // tuple flags
 }

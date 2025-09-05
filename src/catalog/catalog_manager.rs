@@ -36,7 +36,6 @@ impl CatalogManager {
         table: &str,
         columns: &[String],
     ) -> Result<&IndexMeta, CatalogError> {
-
         if self.catalog.indexes.contains_key(name) {
             return Err(CatalogError::IndexExists(name.into()));
         }
@@ -56,13 +55,12 @@ impl CatalogManager {
         save_catalog_atomic(&self.data_dir, &self.catalog)?;
 
         Ok(self.catalog.indexes.get(name).unwrap())
-
     }
 
     pub fn get_indexes(&self) -> &HashMap<String, IndexMeta> {
         &self.catalog.indexes
     }
-    
+
     pub fn create_table(
         &mut self,
         name: &str,

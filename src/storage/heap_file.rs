@@ -1,6 +1,6 @@
 use crate::consts::catalog_consts::PAGE_SIZE;
 use crate::consts::page_consts::ITEM_ID_SIZE;
-use crate::types::page_types::{ItemId, Page};
+use crate::types::page_types::{ItemId, Page, TupleHeader};
 use crate::types::storage_types::{Column, Row};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -77,12 +77,12 @@ impl HeapFile {
         page
     }
 
-    pub fn get_tuple(&self, page_no: u32, slot_no: usize, schema: &[Column]) -> Option<Row> {
+    pub fn get_tuple(&self, page_no: u32, slot_no: usize, schema: &[Column]) -> Option<(TupleHeader, Row)> {
         let page = self.read_page(page_no);
         page.get_tuple(slot_no, schema)
     }
 
-    pub fn insert_row(&self, row: Row) -> Result<(usize, usize), String> {
+    pub fn insert_row(&self, row: Row, xid: u32) -> Result<(usize, usize), String> {
         // find last page number
         let metadata = std::fs::metadata(&self.path).map_err(|e| e.to_string())?;
         let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
@@ -92,87 +92,83 @@ impl HeapFile {
         let mut page = self.read_page(last_page_no);
 
         // try insert row
-        if let Ok(slot_no) = page.insert_tuple(row.clone()) {
+        if let Ok(slot_no) = page.insert_tuple(row.clone(), xid) {
             // row fits into existing page
             self.write_page(&page);
             Ok((last_page_no as usize, slot_no))
         } else {
             // not enough space → create new page
             let mut page = self.append_page();
-            let slot_no = page.insert_tuple(row).map_err(|e| e.to_string())?;
+            let slot_no = page.insert_tuple(row, xid).map_err(|e| e.to_string())?;
             let new_page_no = page_count;
             self.write_page(&page);
             Ok((new_page_no as usize, slot_no))
         }
     }
 
-    /// Scan all rows from all pages, decoding tuples using the provided schema
-    pub fn scan_all(&self, schema: &[Column]) -> Vec<Row> {
+    pub fn scan_all(&self, schema: &[Column]) -> Vec<(u32, usize, TupleHeader, Row)> {
         let mut rows = Vec::new();
-
-        // compute number of pages in file
         let metadata = std::fs::metadata(&self.path).expect("metadata failed");
         let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
-
-        // iterate through all pages
+    
         for page_no in 0..page_count {
             let page = self.read_page(page_no);
-            // iterate over slots
             for slot_no in 0..page.header.slot_count {
-                if let Some(row) = page.get_tuple(slot_no as usize, schema) {
-                    rows.push(row); // collect valid row
+                if let Some((header, row)) = page.get_tuple(slot_no as usize, schema) {
+                    rows.push((page_no, slot_no as usize, header, row));
                 }
             }
         }
         rows
     }
+    
 
-    /// Scan all rows and also return their physical position (page_no, slot_no)
-    pub fn scan_all_with_pos(&self, schema: &[Column]) -> Vec<(u32, usize, Row)> {
-        let mut rows = Vec::new();
-        let metadata = std::fs::metadata(&self.path).expect("metadata failed");
-        let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
-
-        for page_no in 0..page_count {
-            let page = self.read_page(page_no);
-            for slot_no in 0..page.header.slot_count {
-                if let Some(row) = page.get_tuple(slot_no as usize, schema) {
-                    rows.push((page_no, slot_no as usize, row));
-                }
-            }
-        }
-        rows
-    }
-
-    pub fn delete_at(&self, page_no: u32, slot_no: usize) -> Result<(), String> {
+    pub fn delete_at(&self, page_no: u32, slot_no: usize, xid: u32) -> Result<(), String> {
         let mut page = self.read_page(page_no);
         if slot_no as u16 >= page.header.slot_count {
             return Err("Invalid slot_no".into());
         }
-
+    
         // compute offset of the item header in the page
         let slot_offset: usize = PAGE_SIZE as usize - (slot_no + 1) * ITEM_ID_SIZE;
-        let mut item = ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
-        item.flags = 0; // mark as deleted
-        page.data[slot_offset..slot_offset + ITEM_ID_SIZE].copy_from_slice(&item.to_bytes());
-
+        let item = ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
+    
+        if item.flags == 0 {
+            return Err("Slot already unused".into());
+        }
+    
+        // slice out tuple bytes
+        let tuple_bytes = &mut page.data[item.offset as usize..(item.offset + item.len) as usize];
+    
+        // read header
+        let mut header = TupleHeader::from_bytes(tuple_bytes, /* column_count */ 0); // pass real count
+        header.xmax = Some(xid);
+    
+        // overwrite header bytes
+        let header_bytes = header.to_bytes();
+        tuple_bytes[..header_bytes.len()].copy_from_slice(&header_bytes);
+    
         self.write_page(&page);
         Ok(())
     }
+    
 
     /// Update an existing row at a given page/slot, or move it if it no longer fits
-    pub fn update_row(&self, page_no: u32, slot_no: usize, new_row: Row) -> Result<(), String> {
-        self.delete_at(page_no, slot_no)?;
-
+    pub fn update_row(&self, page_no: u32, slot_no: usize, new_row: Row, xid: u32) -> Result<(), String> {
+        // mark old tuple as deleted for this xid
+        self.delete_at(page_no, slot_no, xid)?;
+    
+        // insert new tuple with xmin = xid
         let mut page: Page = self.read_page(page_no);
-        if page.insert_tuple(new_row.clone()).is_ok() {
+        if page.insert_tuple(new_row.clone(), xid).is_ok() {
             self.write_page(&page);
             Ok(())
         } else {
             let mut new_page = self.append_page();
-            new_page.insert_tuple(new_row).map_err(|e| e.to_string())?;
+            new_page.insert_tuple(new_row, xid).map_err(|e| e.to_string())?;
             self.write_page(&new_page);
             Ok(())
         }
     }
+    
 }

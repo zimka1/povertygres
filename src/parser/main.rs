@@ -21,18 +21,26 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
         condition = Some(parse_where(after_where)?);
     }
 
-    if input.to_ascii_lowercase().starts_with("create table ") {
+    let lower = input.to_ascii_lowercase();
+
+    if lower.starts_with("create table ") {
         parse_create_table(input)
-    } else if input.to_ascii_lowercase().starts_with("create index") {
+    } else if lower.starts_with("create index") {
         parse_create_index(input)
-    } else if input.to_ascii_lowercase().starts_with("insert into") {
+    } else if lower.starts_with("insert into") {
         parse_insert(input)
-    } else if input.to_ascii_lowercase().starts_with("select ") {
+    } else if lower.starts_with("select ") {
         parse_select(input, condition)
-    } else if input.to_ascii_lowercase().starts_with("delete ") {
+    } else if lower.starts_with("delete ") {
         parse_delete(input, condition)
-    } else if input.to_ascii_lowercase().starts_with("update ") {
+    } else if lower.starts_with("update ") {
         parse_update(input, condition)
+    } else if lower == "begin" {
+        Ok(Query::Begin)
+    } else if lower == "commit" {
+        Ok(Query::Commit)
+    } else if lower == "rollback" {
+        Ok(Query::Rollback)
     } else {
         Err("Unrecognized command".to_string())
     }

@@ -4,7 +4,7 @@ use crate::errors::engine_error::EngineError;
 use crate::storage::heap_file::HeapFile;
 use crate::types::b_tree::BTreeIndex;
 use crate::types::catalog_types::{CatColumnType, ColumnMeta};
-use crate::types::storage_types::{Column, Database, Table};
+use crate::types::storage_types::{Column, Database, Row, Table};
 use crate::types::storage_types::{ColumnType, ForeignKeyConstraint};
 
 use std::path::{Path, PathBuf};
@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 pub struct Engine {
     pub db: Database,
     pub cat: CatalogManager,
+    pub current_xid: Option<u32>,
 }
 
 impl Engine {
@@ -49,9 +50,12 @@ impl Engine {
 
         for (iname, imeta) in cat.catalog().indexes.iter() {
             let mut idx = BTreeIndex::new(
-                imeta.name.clone(), imeta.table.clone(), imeta.columns.clone());
+                imeta.name.clone(),
+                imeta.table.clone(),
+                imeta.columns.clone(),
+            );
             if let Some(table) = db.tables.get(&imeta.table) {
-                let rows = table.heap.scan_all(&table.columns);
+                let rows: Vec<Row> = table.heap.scan_all(&table.columns).into_iter().map(|(_, _, _, row)| row).collect();
                 for (pos, row) in rows.into_iter().enumerate() {
                     let mut key = Vec::new();
                     for col in &imeta.columns {
@@ -67,7 +71,7 @@ impl Engine {
             }
             db.indexes.insert(iname.clone(), idx);
         }
-        Ok(Self { db, cat })
+        Ok(Self { db, cat, current_xid: None })
     }
 
     pub fn create_table_in_both(
@@ -118,7 +122,6 @@ impl Engine {
         table_name: &str,
         columns: Vec<String>,
     ) -> Result<(), EngineError> {
-
         self.cat.create_index(index_name, table_name, &columns)?;
 
         self.db.create_index(index_name, table_name, columns)?;

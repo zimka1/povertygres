@@ -1,6 +1,7 @@
 use super::catalog_types::CatColumnType;
 use crate::storage::heap_file::HeapFile;
 use crate::types::b_tree::BTreeIndex;
+use crate::types::transaction_types::TransactionManager;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -9,6 +10,7 @@ pub struct Database {
     // Stores tables by their name
     pub tables: HashMap<String, Table>,
     pub indexes: HashMap<String, BTreeIndex>,
+    pub transaction_manager: TransactionManager
 }
 
 impl Database {
@@ -17,6 +19,7 @@ impl Database {
         Self {
             tables: HashMap::new(),
             indexes: HashMap::new(),
+            transaction_manager: TransactionManager::new(),
         }
     }
 }

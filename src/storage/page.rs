@@ -27,7 +27,7 @@ impl Page {
         Self { header, data: buf }
     }
 
-    pub fn insert_tuple(&mut self, row: Row) -> Result<usize, String> {
+    pub fn insert_tuple(&mut self, row: Row, xid: u32) -> Result<usize, String> {
         // build null bitmap
         let mut nullmap_bytes = NullBitmap::new(row.values.len());
         for (i, val) in row.values.iter().enumerate() {
@@ -38,7 +38,8 @@ impl Page {
 
         // build tuple header
         let header = TupleHeader {
-            xmin: 0,
+            xmin: xid,
+            xmax: None,
             flags: 0,
             nullmap_bytes,
         };
@@ -91,35 +92,40 @@ impl Page {
         Ok((self.header.slot_count - 1) as usize)
     }
 
-    pub fn get_tuple(&self, slot_no: usize, columns: &[Column]) -> Option<Row> {
+    pub fn get_tuple(&self, slot_no: usize, columns: &[Column]) -> Option<(TupleHeader, Row)> {
         // out of bounds
         if slot_no as u16 >= self.header.slot_count {
             return None;
         }
-
+    
         // find item id in slot array
         let slot_offset = PAGE_SIZE - (slot_no + 1) * ITEM_ID_SIZE;
         let item_bytes = &self.data[slot_offset..slot_offset + ITEM_ID_SIZE];
         let item = ItemId::from_bytes(item_bytes);
-
+    
         if item.flags == 0 {
             return None; // deleted / unused slot
         }
-
+    
         // slice out tuple bytes
         let tuple_bytes = &self.data[item.offset as usize..(item.offset + item.len) as usize];
-
-        // parse tuple header
-        let nullmap_len = u16::from_le_bytes(tuple_bytes[4..6].try_into().unwrap()) as usize;
-        let nullmap_bytes = tuple_bytes[6..6 + nullmap_len].to_vec();
-        let flags_offset = 6 + nullmap_len;
-
+    
+        // parse tuple header (xmin, xmax, nullmap, flags)
+        let xmin = u32::from_le_bytes(tuple_bytes[0..4].try_into().unwrap());
+        let raw_xmax = u32::from_le_bytes(tuple_bytes[4..8].try_into().unwrap());
+        let xmax = if raw_xmax == 0 { None } else { Some(raw_xmax) };
+    
+        let nullmap_len = u16::from_le_bytes(tuple_bytes[8..10].try_into().unwrap()) as usize;
+        let nullmap_bytes = tuple_bytes[10..10 + nullmap_len].to_vec();
+        let flags_offset = 10 + nullmap_len;
+        let flags = u16::from_le_bytes(tuple_bytes[flags_offset..flags_offset + 2].try_into().unwrap());
+    
         // construct null bitmap
         let nullmap = NullBitmap {
             bytes: nullmap_bytes,
             column_count: columns.len(),
         };
-
+    
         // parse values
         let mut values = Vec::new();
         let mut cursor = flags_offset + 2;
@@ -136,8 +142,7 @@ impl Page {
                 }
                 ColumnType::Text => {
                     let len =
-                        u16::from_le_bytes(tuple_bytes[cursor..cursor + 2].try_into().unwrap())
-                            as usize;
+                        u16::from_le_bytes(tuple_bytes[cursor..cursor + 2].try_into().unwrap()) as usize;
                     cursor += 2;
                     let s = String::from_utf8(tuple_bytes[cursor..cursor + len].to_vec()).unwrap();
                     values.push(Value::Text(s));
@@ -150,7 +155,14 @@ impl Page {
                 }
             }
         }
-
-        Some(Row { values })
-    }
+    
+        let header = TupleHeader {
+            xmin,
+            xmax,
+            nullmap_bytes: nullmap,
+            flags,
+        };
+    
+        Some((header, Row { values }))
+    }    
 }
