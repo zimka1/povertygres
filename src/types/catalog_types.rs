@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::storage_types::Value;
 use std::collections::{BTreeMap, HashMap};
 
+/// Supported column types in catalog metadata
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CatColumnType {
     Int32, // integer column
@@ -11,6 +12,7 @@ pub enum CatColumnType {
     Bool,  // boolean column
 }
 
+/// Metadata describing a single column
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColumnMeta {
     pub name: String, // column name
@@ -20,6 +22,7 @@ pub struct ColumnMeta {
     pub default: Option<Value>, // optional default value
 }
 
+/// Metadata describing a table definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableMeta {
     pub oid: u32,                                // unique table ID
@@ -30,27 +33,29 @@ pub struct TableMeta {
     pub foreign_keys: Vec<ForeignKeyConstraint>, // list of foreign keys
 }
 
+/// Global catalog structure, persisted on disk
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Catalog {
     pub version: u32,                        // catalog format version
     pub page_size: u32,                      // page size used by DB
     pub next_table_oid: u32,                 // counter for new table IDs
-    pub next_xid: u32,
-    pub transactions: HashMap<u32, TxStatus>,
-    pub indexes: HashMap<String, IndexMeta>,
+    pub next_xid: u32,                       // counter for new transaction IDs
+    pub transactions: HashMap<u32, TxStatus>,// transaction status map (xid -> status)
+    pub indexes: HashMap<String, IndexMeta>, // defined indexes
     pub tables: BTreeMap<String, TableMeta>, // map table name → metadata
 }
 
+/// Metadata describing an index
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexMeta {
-    pub name: String,
-    pub table: String,
-    pub columns: Vec<String>,
+    pub name: String,           // index name
+    pub table: String,          // table name this index belongs to
+    pub columns: Vec<String>,   // indexed columns
 }
 
 impl Catalog {
+    /// Create a new empty catalog with no tables or indexes
     pub fn empty(page_size: u32) -> Self {
-        // create empty catalog with no tables
         Self {
             version: 1,
             page_size,
@@ -58,12 +63,12 @@ impl Catalog {
             next_xid: 1,
             tables: BTreeMap::new(),
             indexes: HashMap::new(),
-            transactions: HashMap::new()
+            transactions: HashMap::new(),
         }
     }
 
+    /// Check if a table with the given name exists in the catalog
     pub fn has_table(&self, name: &str) -> bool {
-        // check if a table with this name exists in the catalog
         self.tables.contains_key(name)
     }
 }

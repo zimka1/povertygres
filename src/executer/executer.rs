@@ -3,7 +3,6 @@ use super::select::TableArg;
 use crate::engine::Engine;
 use crate::errors::engine_error::EngineError;
 use crate::types::parser_types::{FromItem, Query};
-use crate::types::transaction_types::TxStatus;
 
 /// Executes a parsed query (AST) against the database
 pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
@@ -12,29 +11,14 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
             if engine.current_xid.is_some() {
                 return Err("Transaction already in progress".to_string().into());
             }
-            let xid = {
-                let cat = engine.cat.catalog_mut();
-                let xid = cat.next_xid;
-                cat.next_xid += 1;
-                xid
-            };
-            engine.db.transaction_manager.begin(xid);
-            {
-                let cat = engine.cat.catalog_mut();
-                cat.transactions.insert(xid, TxStatus::InProgress);
-            }
-            engine.cat.persist()?;
+            let xid = engine.next_xid();
+            engine.begin_tx(xid);
             engine.current_xid = Some(xid);
             println!("BEGIN (xid = {})", xid);
         }
         Query::Commit => {
             if let Some(xid) = engine.current_xid.take() {
-                engine.db.transaction_manager.commit(xid);
-                {
-                    let cat = engine.cat.catalog_mut();
-                    cat.transactions.insert(xid, TxStatus::Committed);
-                }
-                engine.cat.persist()?;
+                engine.commit_tx(xid);
                 println!("COMMIT (xid = {})", xid);
             } else {
                 return Err("No active transaction".to_string().into());
@@ -42,12 +26,7 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
         }
         Query::Rollback => {
             if let Some(xid) = engine.current_xid.take() {
-                engine.db.transaction_manager.rollback(xid);
-                {
-                    let cat = engine.cat.catalog_mut();
-                    cat.transactions.insert(xid, TxStatus::Aborted);
-                }
-                engine.cat.persist()?;
+                engine.rollback_tx(xid);
                 println!("ROLLBACK (xid = {})", xid);
             } else {
                 return Err("No active transaction".to_string().into());
@@ -77,24 +56,13 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
         } => {
             if let Some(xid) = engine.current_xid {
                 // inside active transaction
-                engine
-                    .db
-                    .insert_into(&table_name, column_names, values, xid)?;
+                engine.db.insert_into(&table_name, column_names, values, xid)?;
             } else {
                 // autocommit mode
-                let xid = {
-                    let cat = engine.cat.catalog_mut();
-                    let xid = cat.next_xid; cat.next_xid += 1; xid
-                };
-                engine.db.transaction_manager.begin(xid);
-                { let cat = engine.cat.catalog_mut(); cat.transactions.insert(xid, TxStatus::InProgress); }
-                engine.cat.persist()?;
-                engine
-                    .db
-                    .insert_into(&table_name, column_names, values, xid)?;
-                engine.db.transaction_manager.commit(xid);
-                { let cat = engine.cat.catalog_mut(); cat.transactions.insert(xid, TxStatus::Committed); }
-                engine.cat.persist()?;
+                let xid = engine.next_xid();
+                engine.begin_tx(xid);
+                engine.db.insert_into(&table_name, column_names, values, xid)?;
+                engine.commit_tx(xid);
             }
         }
         // SELECT ... FROM ...
@@ -105,11 +73,7 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
             filter,
         } => {
             // choose xid (active or autocommit)
-            let xid = if let Some(x) = engine.current_xid {
-                x
-            } else {
-                engine.current_xid.unwrap_or(0)
-            };
+            let xid = engine.current_xid.unwrap_or(0);
 
             let (columns, rows) = match from_table {
                 FromItem::Table(table_name) => engine.db.select(
@@ -120,9 +84,7 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
                 )?,
                 _ => {
                     let join = engine.db.collect_join_table(from_table, &aliases)?;
-                    engine
-                        .db
-                        .select(&TableArg::JoinTable(join), &column_names, filter, xid)?
+                    engine.db.select(&TableArg::JoinTable(join), &column_names, filter, xid)?
                 }
             };
 
@@ -143,17 +105,10 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
                 let deleted = engine.db.delete(&table_name, filter, xid)?;
                 println!("DELETE {}", deleted);
             } else {
-                let xid = {
-                    let cat = engine.cat.catalog_mut();
-                    let xid = cat.next_xid; cat.next_xid += 1; xid
-                };
-                engine.db.transaction_manager.begin(xid);
-                { let cat = engine.cat.catalog_mut(); cat.transactions.insert(xid, TxStatus::InProgress); }
-                engine.cat.persist()?;
+                let xid = engine.next_xid();
+                engine.begin_tx(xid);
                 let deleted = engine.db.delete(&table_name, filter, xid)?;
-                engine.db.transaction_manager.commit(xid);
-                { let cat = engine.cat.catalog_mut(); cat.transactions.insert(xid, TxStatus::Committed); }
-                engine.cat.persist()?;
+                engine.commit_tx(xid);
                 println!("DELETE {}", deleted);
             }
         }
@@ -166,23 +121,12 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
             filter,
         } => {
             if let Some(xid) = engine.current_xid {
-                engine
-                    .db
-                    .update(&table_name, column_names, values, filter, xid)?;
+                engine.db.update(&table_name, column_names, values, filter, xid)?;
             } else {
-                let xid = {
-                    let cat = engine.cat.catalog_mut();
-                    let xid = cat.next_xid; cat.next_xid += 1; xid
-                };
-                engine.db.transaction_manager.begin(xid);
-                { let cat = engine.cat.catalog_mut(); cat.transactions.insert(xid, TxStatus::InProgress); }
-                engine.cat.persist()?;
-                engine
-                    .db
-                    .update(&table_name, column_names, values, filter, xid)?;
-                engine.db.transaction_manager.commit(xid);
-                { let cat = engine.cat.catalog_mut(); cat.transactions.insert(xid, TxStatus::Committed); }
-                engine.cat.persist()?;
+                let xid = engine.next_xid();
+                engine.begin_tx(xid);
+                engine.db.update(&table_name, column_names, values, filter, xid)?;
+                engine.commit_tx(xid);
             }
         }
 

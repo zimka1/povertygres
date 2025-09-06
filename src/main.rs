@@ -6,7 +6,6 @@ mod errors;
 mod executer;
 mod parser;
 mod storage;
-mod transactions;
 mod types;
 
 use crate::engine::Engine;
