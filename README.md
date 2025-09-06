@@ -63,6 +63,12 @@ Goal: implement core PostgreSQL architecture and algorithms.
   * [x] `UPDATE`: old tuple gets `xmax = xid`, new version inserted with `xmin = xid`
   * [x] Rollback discards uncommitted versions
   * [x] Joins and scans return only visible versions (old + new until vacuum)
+  * [x] `VACUUM` support:
+    * [x] `TupleHeader::is_dead(tm)` detects tuples with committed `xmax`
+    * [x] `HeapFile::vacuum` scans pages, reclaims slots of dead tuples
+    * [x] Integrated `VACUUM table` command in executor
+    * [x] Frees space for new inserts, but no page compaction yet
+
 
 ---
 
