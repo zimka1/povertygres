@@ -34,7 +34,7 @@ pub fn execute(engine: &mut Engine, ast: Query) -> Result<(), EngineError> {
         }
         Query::Vacuum { table_name } => {
             if let Some(tab) = engine.db.tables.get(&table_name) {
-                let removed = tab.heap.vacuum(&engine.db.transaction_manager, &tab.columns);
+                let removed = tab.heap.vacuum(&engine.db.transaction_manager, &tab.columns, &table_name, &mut engine.db.indexes);
                 println!("VACUUM {}: removed {} dead tuples", table_name, removed);
             } else {
                 return Err(format!("Table '{}' not found", table_name).to_string().into());

@@ -1,8 +1,11 @@
 use crate::consts::catalog_consts::PAGE_SIZE;
 use crate::consts::page_consts::ITEM_ID_SIZE;
+use crate::executer::help_functions::build_key;
+use crate::types::b_tree::BTreeIndex;
 use crate::types::page_types::{ItemId, Page, TupleHeader};
 use crate::types::storage_types::{Column, Row};
 use crate::types::transaction_types::TransactionManager;
+use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
@@ -192,36 +195,50 @@ impl HeapFile {
     }
     
 
-    pub fn vacuum(&self, tm: &TransactionManager, columns: &[Column]) -> usize {
+    pub fn vacuum(
+        &self,
+        tm: &TransactionManager,
+        columns: &[Column],
+        table_name: &str,
+        indexes: &mut HashMap<String, BTreeIndex>,
+    ) -> usize {
         let mut removed = 0;
-        let file = OpenOptions::new()
-            .append(true)
-            .open(&self.path)
-            .expect("open failed");
-        let metadata = file.metadata().expect("metadata failed");
+        let metadata = std::fs::metadata(&self.path).expect("metadata failed");
         let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
-
+    
         for page_no in 0..page_count {
-            let mut page = self.read_page(page_no);
-
+            let page = self.read_page(page_no);
+            let mut new_page = Page::new(page_no);
+    
             for slot_no in 0..page.header.slot_count {
-                let slot_offset: usize = PAGE_SIZE as usize - (slot_no + 1) as usize * ITEM_ID_SIZE;
-                let mut item = ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
+                let slot_offset: usize =
+                    PAGE_SIZE as usize - (slot_no + 1) as usize * ITEM_ID_SIZE;
+                let item =
+                    ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
                 if !item.is_used() {
                     continue;
                 }
-                if let Some((header, _)) = page.get_tuple(slot_no as usize, columns) {
+    
+                if let Some((header, row)) = page.get_tuple(slot_no as usize, columns) {
                     if header.is_dead(tm) {
-                        item.mark_unused();
-                        page.data[slot_offset..slot_offset + ITEM_ID_SIZE]
-                            .copy_from_slice(&item.to_bytes());
+                        for idx in indexes.values_mut().filter(|i| i.table == table_name) {
+                            let key = build_key(&idx.columns, columns, &row.values, table_name)
+                                .expect("failed to build key");
+                            idx.remove(&key, (page_no as usize, slot_no as usize));
+                        }                        
                         removed += 1;
+                    } else {
+                        new_page
+                            .insert_tuple(row.clone(), header.xmin)
+                            .expect("failed to insert tuple during compaction");
                     }
                 }
-
             }
-            self.write_page(&page);
+    
+            // теперь пишем перепакованную страницу
+            self.write_page(&new_page);
         }
+    
         removed
-    }
+    }    
 }

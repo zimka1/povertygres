@@ -3,7 +3,7 @@ use crate::types::storage_types::{Row, Value};
 
 pub fn build_key(
     index_columns: &Vec<String>,
-    table_columns: &Vec<Column>,
+    table_columns: &[Column],
     values: &Vec<Value>,
     table_name: &str,
 ) -> Result<Vec<Value>, String> {
