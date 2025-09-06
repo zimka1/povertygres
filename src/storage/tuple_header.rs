@@ -20,28 +20,39 @@ impl TupleHeader {
         }
     }
 
+    pub fn is_dead(&self, tm: &TransactionManager) -> bool {
+        match self.xmax {
+            None => false,
+            Some(x) => match tm.status(x) {
+                TxStatus::InProgress => false,
+                TxStatus::Aborted   => false,
+                TxStatus::Committed => true,
+            },
+        }
+    }
+    
+
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-    
+
         // xmin
         buf.extend_from_slice(&self.xmin.to_le_bytes());
-    
+
         // xmax (0 means None)
         buf.extend_from_slice(&self.xmax.unwrap_or(0).to_le_bytes());
-    
+
         // length of null bitmap
         let null_len = self.nullmap_bytes.size() as u16;
         buf.extend_from_slice(&null_len.to_le_bytes());
-    
+
         // raw null bitmap
         buf.extend_from_slice(&self.nullmap_bytes.bytes);
-    
+
         // flags
         buf.extend_from_slice(&self.flags.to_le_bytes());
-    
+
         buf
     }
-    
 
     pub fn from_bytes(buf: &[u8], column_count: usize) -> Self {
         // read xmin
@@ -50,7 +61,7 @@ impl TupleHeader {
         // read xmax
         let raw_xmax = u32::from_le_bytes(buf[4..8].try_into().unwrap());
         let xmax = if raw_xmax == 0 { None } else { Some(raw_xmax) };
-        
+
         // read null bitmap length and bytes
         let null_len = u16::from_le_bytes(buf[8..10].try_into().unwrap()) as usize;
         let null_bytes = buf[10..10 + null_len].to_vec();

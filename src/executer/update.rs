@@ -147,7 +147,7 @@ impl Database {
             }
 
             // If all checks pass, write updated row back to storage
-            table.heap.update_row(page_no, slot_no, row, xid)?;
+            table.heap.update_row(page_no, slot_no, row, xid, &table.columns)?;
         }
 
         Ok(())

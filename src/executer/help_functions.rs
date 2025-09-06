@@ -1,5 +1,5 @@
-use crate::types::storage_types::{Row, Value};
 use crate::types::storage_types::{Column, Database, Table};
+use crate::types::storage_types::{Row, Value};
 
 pub fn build_key(
     index_columns: &Vec<String>,
@@ -57,7 +57,12 @@ pub fn validate_foreign_keys(
             ref_indices.push(idx);
         }
 
-        let parent_rows: Vec<Row> = parent_table.heap.scan_all(&parent_table.columns).into_iter().map(|(_, _, _, row)| row).collect();
+        let parent_rows: Vec<Row> = parent_table
+            .heap
+            .scan_all(&parent_table.columns)
+            .into_iter()
+            .map(|(_, _, _, row)| row)
+            .collect();
         let mut found = false;
         for prow in parent_rows {
             if local_values
@@ -105,7 +110,12 @@ pub fn ensure_not_referenced(
                     ref_values.push(row_values[idx].clone());
                 }
 
-                let child_rows: Vec<Row> = other_table.heap.scan_all(&other_table.columns).into_iter().map(|(_, _, _, row)| row).collect();
+                let child_rows: Vec<Row> = other_table
+                    .heap
+                    .scan_all(&other_table.columns)
+                    .into_iter()
+                    .map(|(_, _, _, row)| row)
+                    .collect();
                 for child in child_rows {
                     let mut match_all = true;
                     for (local_col, ref_val) in fk.local_columns.iter().zip(ref_values.iter()) {

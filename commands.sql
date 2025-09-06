@@ -80,3 +80,23 @@ select * from users where id < 5;
 
 select * from users where active = true;
 select * from users where id = 2 and active = true;
+
+vacuum users;
+
+begin;
+delete from users where id = 7;
+commit;
+vacuum users;
+
+begin;
+update users set name = "Aleksei" where id = 5;
+commit;
+vacuum users;
+
+select * from users;
+begin;
+delete from users where id = 5;
+rollback;
+vacuum users;
+select * from users;
+

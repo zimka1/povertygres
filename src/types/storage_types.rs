@@ -10,7 +10,7 @@ pub struct Database {
     // Stores tables by their name
     pub tables: HashMap<String, Table>,
     pub indexes: HashMap<String, BTreeIndex>,
-    pub transaction_manager: TransactionManager
+    pub transaction_manager: TransactionManager,
 }
 
 impl Database {

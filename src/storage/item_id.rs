@@ -3,6 +3,14 @@ use crate::types::page_types::ItemId;
 use std::convert::TryInto;
 
 impl ItemId {
+    pub fn mark_unused(&mut self) {
+        self.flags = 0;
+    }
+
+    pub fn is_used(&self) -> bool {
+        self.flags != 0
+    }
+    
     pub fn to_bytes(&self) -> [u8; ITEM_ID_SIZE] {
         let mut buf = [0u8; ITEM_ID_SIZE];
 

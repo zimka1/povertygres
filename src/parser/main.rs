@@ -2,7 +2,9 @@ use super::{
     create::parse_create_table, insert::parse_insert, select::parse_select, r#where::parse_where,
 };
 use crate::{
-    parser::{delete::parse_delete, index::parse_create_index, update::parse_update},
+    parser::{
+        delete::parse_delete, index::parse_create_index, update::parse_update, vacuum::parse_vacuum,
+    },
     types::parser_types::{Condition, Query},
 };
 
@@ -41,6 +43,8 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
         Ok(Query::Commit)
     } else if lower == "rollback" {
         Ok(Query::Rollback)
+    } else if lower.starts_with("vacuum ") {
+        parse_vacuum(input)
     } else {
         Err("Unrecognized command".to_string())
     }

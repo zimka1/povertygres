@@ -30,6 +30,14 @@ impl CatalogManager {
         &self.catalog // return immutable reference to catalog
     }
 
+    pub fn catalog_mut(&mut self) -> &mut Catalog {
+        &mut self.catalog // return immutable reference to catalog
+    }
+
+    pub fn persist(&self) -> Result<(), CatalogError> {
+        save_catalog_atomic(&self.data_dir, &self.catalog)
+    }
+
     pub fn create_index(
         &mut self,
         name: &str,

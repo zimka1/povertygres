@@ -112,7 +112,12 @@ impl Database {
 
                 Ok(JoinTable {
                     columns,
-                    rows: table.heap.scan_all(&table.columns).into_iter().map(|(_, _, _, row)| row).collect(),
+                    rows: table
+                        .heap
+                        .scan_all(&table.columns)
+                        .into_iter()
+                        .map(|(_, _, _, row)| row)
+                        .collect(),
                 })
             }
         }

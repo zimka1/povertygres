@@ -2,6 +2,7 @@ use crate::consts::catalog_consts::PAGE_SIZE;
 use crate::consts::page_consts::ITEM_ID_SIZE;
 use crate::types::page_types::{ItemId, Page, TupleHeader};
 use crate::types::storage_types::{Column, Row};
+use crate::types::transaction_types::TransactionManager;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
@@ -77,7 +78,12 @@ impl HeapFile {
         page
     }
 
-    pub fn get_tuple(&self, page_no: u32, slot_no: usize, schema: &[Column]) -> Option<(TupleHeader, Row)> {
+    pub fn get_tuple(
+        &self,
+        page_no: u32,
+        slot_no: usize,
+        schema: &[Column],
+    ) -> Option<(TupleHeader, Row)> {
         let page = self.read_page(page_no);
         page.get_tuple(slot_no, schema)
     }
@@ -110,7 +116,7 @@ impl HeapFile {
         let mut rows = Vec::new();
         let metadata = std::fs::metadata(&self.path).expect("metadata failed");
         let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
-    
+
         for page_no in 0..page_count {
             let page = self.read_page(page_no);
             for slot_no in 0..page.header.slot_count {
@@ -121,9 +127,14 @@ impl HeapFile {
         }
         rows
     }
-    
 
-    pub fn delete_at(&self, page_no: u32, slot_no: usize, xid: u32) -> Result<(), String> {
+    pub fn delete_at(
+        &self,
+        page_no: u32,
+        slot_no: usize,
+        xid: u32,
+        columns: &[Column],
+    ) -> Result<(), String> {
         let mut page = self.read_page(page_no);
         if slot_no as u16 >= page.header.slot_count {
             return Err("Invalid slot_no".into());
@@ -133,7 +144,7 @@ impl HeapFile {
         let slot_offset: usize = PAGE_SIZE as usize - (slot_no + 1) * ITEM_ID_SIZE;
         let item = ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
     
-        if item.flags == 0 {
+        if !item.is_used() {
             return Err("Slot already unused".into());
         }
     
@@ -141,7 +152,7 @@ impl HeapFile {
         let tuple_bytes = &mut page.data[item.offset as usize..(item.offset + item.len) as usize];
     
         // read header
-        let mut header = TupleHeader::from_bytes(tuple_bytes, /* column_count */ 0); // pass real count
+        let mut header = TupleHeader::from_bytes(tuple_bytes, columns.len());
         header.xmax = Some(xid);
     
         // overwrite header bytes
@@ -154,9 +165,16 @@ impl HeapFile {
     
 
     /// Update an existing row at a given page/slot, or move it if it no longer fits
-    pub fn update_row(&self, page_no: u32, slot_no: usize, new_row: Row, xid: u32) -> Result<(), String> {
+    pub fn update_row(
+        &self,
+        page_no: u32,
+        slot_no: usize,
+        new_row: Row,
+        xid: u32,
+        columns: &[Column],
+    ) -> Result<(), String> {
         // mark old tuple as deleted for this xid
-        self.delete_at(page_no, slot_no, xid)?;
+        self.delete_at(page_no, slot_no, xid, columns)?;
     
         // insert new tuple with xmin = xid
         let mut page: Page = self.read_page(page_no);
@@ -165,10 +183,45 @@ impl HeapFile {
             Ok(())
         } else {
             let mut new_page = self.append_page();
-            new_page.insert_tuple(new_row, xid).map_err(|e| e.to_string())?;
+            new_page
+                .insert_tuple(new_row, xid)
+                .map_err(|e| e.to_string())?;
             self.write_page(&new_page);
             Ok(())
         }
     }
     
+
+    pub fn vacuum(&self, tm: &TransactionManager, columns: &[Column]) -> usize {
+        let mut removed = 0;
+        let file = OpenOptions::new()
+            .append(true)
+            .open(&self.path)
+            .expect("open failed");
+        let metadata = file.metadata().expect("metadata failed");
+        let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
+
+        for page_no in 0..page_count {
+            let mut page = self.read_page(page_no);
+
+            for slot_no in 0..page.header.slot_count {
+                let slot_offset: usize = PAGE_SIZE as usize - (slot_no + 1) as usize * ITEM_ID_SIZE;
+                let mut item = ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
+                if !item.is_used() {
+                    continue;
+                }
+                if let Some((header, _)) = page.get_tuple(slot_no as usize, columns) {
+                    if header.is_dead(tm) {
+                        item.mark_unused();
+                        page.data[slot_offset..slot_offset + ITEM_ID_SIZE]
+                            .copy_from_slice(&item.to_bytes());
+                        removed += 1;
+                    }
+                }
+
+            }
+            self.write_page(&page);
+        }
+        removed
+    }
 }

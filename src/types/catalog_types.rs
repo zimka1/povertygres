@@ -1,4 +1,4 @@
-use crate::types::storage_types::ForeignKeyConstraint;
+use crate::types::{storage_types::ForeignKeyConstraint, transaction_types::TxStatus};
 use serde::{Deserialize, Serialize};
 
 use super::storage_types::Value;
@@ -35,8 +35,10 @@ pub struct Catalog {
     pub version: u32,                        // catalog format version
     pub page_size: u32,                      // page size used by DB
     pub next_table_oid: u32,                 // counter for new table IDs
-    pub tables: BTreeMap<String, TableMeta>, // map table name → metadata
+    pub next_xid: u32,
+    pub transactions: HashMap<u32, TxStatus>,
     pub indexes: HashMap<String, IndexMeta>,
+    pub tables: BTreeMap<String, TableMeta>, // map table name → metadata
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,8 +55,10 @@ impl Catalog {
             version: 1,
             page_size,
             next_table_oid: 1,
+            next_xid: 1,
             tables: BTreeMap::new(),
             indexes: HashMap::new(),
+            transactions: HashMap::new()
         }
     }
 

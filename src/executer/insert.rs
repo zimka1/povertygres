@@ -10,7 +10,7 @@ impl Database {
         table_name: &str,
         column_names: Option<Vec<String>>, // Optional: user can specify columns
         values: Vec<Value>,                // Values to insert
-        xid: u32
+        xid: u32,
     ) -> Result<(), String> {
         // Get the target table (immutable for now)
         let table = self
@@ -103,7 +103,12 @@ impl Database {
                 return Err(format!("Primary key '{}' cannot be NULL", pk_name));
             }
 
-            let existing_rows: Vec<(Row, TupleHeader)> = table.heap.scan_all(&table.columns).into_iter().map(|(_, _, header, row)| (row, header)).collect();
+            let existing_rows: Vec<(Row, TupleHeader)> = table
+                .heap
+                .scan_all(&table.columns)
+                .into_iter()
+                .map(|(_, _, header, row)| (row, header))
+                .collect();
             for (row, header) in existing_rows {
                 if header.is_visible(xid, &self.transaction_manager) {
                     if row.values[pk_idx] == *pk_val {

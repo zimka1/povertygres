@@ -17,7 +17,12 @@ fn single_meta(table_name: &str, cols: &Vec<Column>) -> Vec<JoinTableColumn> {
 impl Database {
     /// Deletes rows from `table_name` that match `filter`.
     /// Returns the number of deleted rows.
-    pub fn delete(&mut self, table_name: &str, filter: Option<Condition>, xid: u32) -> Result<usize, String> {
+    pub fn delete(
+        &mut self,
+        table_name: &str,
+        filter: Option<Condition>,
+        xid: u32,
+    ) -> Result<usize, String> {
         // Immutable borrow for scanning and metadata
         let table = self
             .tables
@@ -52,7 +57,7 @@ impl Database {
                         }
 
                         // If all FK checks passed → delete row
-                        table.heap.delete_at(page_no, slot_no, xid)?;
+                        table.heap.delete_at(page_no, slot_no, xid, &table.columns)?;
                         deleted_count += 1;
                     }
                     Ok(false) => { /* keep row */ }

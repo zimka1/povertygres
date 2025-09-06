@@ -6,6 +6,7 @@ use crate::types::b_tree::BTreeIndex;
 use crate::types::catalog_types::{CatColumnType, ColumnMeta};
 use crate::types::storage_types::{Column, Database, Row, Table};
 use crate::types::storage_types::{ColumnType, ForeignKeyConstraint};
+use crate::types::transaction_types::TransactionManager;
 
 use std::path::{Path, PathBuf};
 
@@ -48,6 +49,10 @@ impl Engine {
             );
         }
 
+        db.transaction_manager = TransactionManager::from_map(
+            cat.catalog().transactions.clone()
+        );
+
         for (iname, imeta) in cat.catalog().indexes.iter() {
             let mut idx = BTreeIndex::new(
                 imeta.name.clone(),
@@ -55,7 +60,12 @@ impl Engine {
                 imeta.columns.clone(),
             );
             if let Some(table) = db.tables.get(&imeta.table) {
-                let rows: Vec<Row> = table.heap.scan_all(&table.columns).into_iter().map(|(_, _, _, row)| row).collect();
+                let rows: Vec<Row> = table
+                    .heap
+                    .scan_all(&table.columns)
+                    .into_iter()
+                    .map(|(_, _, _, row)| row)
+                    .collect();
                 for (pos, row) in rows.into_iter().enumerate() {
                     let mut key = Vec::new();
                     for col in &imeta.columns {
@@ -71,7 +81,11 @@ impl Engine {
             }
             db.indexes.insert(iname.clone(), idx);
         }
-        Ok(Self { db, cat, current_xid: None })
+        Ok(Self {
+            db,
+            cat,
+            current_xid: None,
+        })
     }
 
     pub fn create_table_in_both(

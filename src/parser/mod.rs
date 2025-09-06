@@ -5,4 +5,5 @@ mod insert;
 pub mod main;
 mod select;
 mod update;
+mod vacuum;
 pub mod r#where;

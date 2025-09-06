@@ -23,7 +23,9 @@ fn phys_to_join(tm: &TransactionManager, table: &Table, alias: &str, xid: u32) -
         })
         .collect();
 
-    let rows = table.heap.scan_all(&table.columns)
+    let rows = table
+        .heap
+        .scan_all(&table.columns)
         .into_iter()
         .filter(|(_, _, header, _)| header.is_visible(xid, tm))
         .map(|(_, _, _, row)| row)
@@ -171,7 +173,7 @@ impl Database {
         table_arg: &TableArg,
         column_names: &Vec<String>,
         filter: Option<Condition>,
-        xid: u32
+        xid: u32,
     ) -> Result<(Vec<JoinTableColumn>, Vec<Row>), String> {
         // 1) Normalize input into JoinTable
         let exec: JoinTable = match table_arg {
@@ -195,7 +197,7 @@ impl Database {
                     }
                 } else {
                     // For plain table, use its name as alias
-                    phys_to_join(&self.transaction_manager,t, name, xid)
+                    phys_to_join(&self.transaction_manager, t, name, xid)
                 }
             }
         };

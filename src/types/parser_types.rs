@@ -10,6 +10,9 @@ pub enum Query {
     Begin,
     Commit,
     Rollback,
+    Vacuum {
+        table_name: String,
+    },
     /// CREATE TABLE table_name (col1 type1, col2 type2, ...)
     CreateTable {
         table_name: String,
