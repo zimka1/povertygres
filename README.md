@@ -71,6 +71,11 @@ Goal: implement core PostgreSQL architecture and algorithms.
     * [x] **Page compaction**: live tuples copied into fresh page layout, 
           dead tuples and gaps removed, ensuring contiguous free space
     * [x] **Index cleanup**: dangling entries removed from all BTree indexes
+  * [x] **Snapshots**:
+    * [x] `Snapshot` struct records `xmax` and active XIDs
+    * [x] Each `BEGIN` creates a snapshot from `TransactionManager`
+    * [x] `TupleHeader::is_visible(xid, snapshot, tm)` enforces snapshot rules
+    * [x] Provides **READ COMMITTED** isolation (queries see only committed data at execution time)
 
 ---
 
