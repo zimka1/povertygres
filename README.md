@@ -67,8 +67,10 @@ Goal: implement core PostgreSQL architecture and algorithms.
     * [x] `TupleHeader::is_dead(tm)` detects tuples with committed `xmax`
     * [x] `HeapFile::vacuum` scans pages, reclaims slots of dead tuples
     * [x] Integrated `VACUUM table` command in executor
-    * [x] Frees space for new inserts, but no page compaction yet
-
+    * [x] Frees space for new inserts
+    * [x] **Page compaction**: live tuples copied into fresh page layout, 
+          dead tuples and gaps removed, ensuring contiguous free space
+    * [x] **Index cleanup**: dangling entries removed from all BTree indexes
 
 ---
 
