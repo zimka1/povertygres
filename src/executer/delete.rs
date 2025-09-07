@@ -3,6 +3,7 @@ use crate::executer::help_functions::{build_key, ensure_not_referenced};
 use crate::executer::join::JoinTableColumn;
 use crate::types::parser_types::Condition;
 use crate::types::storage_types::{Column, Database};
+use crate::types::transaction_types::Snapshot;
 
 /// Build column metadata for a single table
 fn single_meta(table_name: &str, cols: &Vec<Column>) -> Vec<JoinTableColumn> {
@@ -22,6 +23,7 @@ impl Database {
         table_name: &str,
         filter: Option<Condition>,
         xid: u32,
+        snapshot: &Snapshot
     ) -> Result<usize, String> {
         // Immutable borrow for scanning and metadata
         let table = self
@@ -36,7 +38,7 @@ impl Database {
             let rows = table.heap.scan_all(&table.columns);
 
             for (page_no, slot_no, header, row) in rows {
-                if !header.is_visible(xid, &self.transaction_manager) {
+                if !header.is_visible(xid, snapshot, &self.transaction_manager) {
                     continue;
                 }
                 match eval_condition(cond, &row, &metas, None, None) {
@@ -57,7 +59,7 @@ impl Database {
                         }
 
                         // If all FK checks passed → delete row
-                        table.heap.delete_at(page_no, slot_no, xid, &table.columns)?;
+                        table.heap.delete_at(page_no, slot_no, xid)?;
                         deleted_count += 1;
                     }
                     Ok(false) => { /* keep row */ }

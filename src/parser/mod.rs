@@ -6,4 +6,6 @@ pub mod main;
 mod select;
 mod update;
 mod vacuum;
+mod begin;
+mod set_isolation;
 pub mod r#where;

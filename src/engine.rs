@@ -4,9 +4,9 @@ use crate::errors::engine_error::EngineError;
 use crate::storage::heap_file::HeapFile;
 use crate::types::b_tree::BTreeIndex;
 use crate::types::catalog_types::{CatColumnType, ColumnMeta};
-use crate::types::storage_types::{Column, Database, Row, Table};
+use crate::types::storage_types::{Column, Database, Table};
 use crate::types::storage_types::{ColumnType, ForeignKeyConstraint};
-use crate::types::transaction_types::{TransactionManager, TxStatus};
+use crate::types::transaction_types::{IsolationLevel, Snapshot, TransactionManager, TxStatus};
 
 use std::path::{Path, PathBuf};
 
@@ -15,6 +15,9 @@ pub struct Engine {
     pub db: Database,           // in-memory database state (tables, indexes, tx manager)
     pub cat: CatalogManager,    // persistent catalog manager (metadata on disk)
     pub current_xid: Option<u32>, // active transaction ID (if any)
+    pub session_isolation: IsolationLevel,
+    pub tx_isolation: Option<IsolationLevel>,
+    pub repeatable_snapshot: Option<Snapshot>,
 }
 
 impl Engine {
@@ -58,7 +61,8 @@ impl Engine {
 
         // Restore transaction statuses from catalog into transaction manager
         db.transaction_manager = TransactionManager::from_map(
-            cat.catalog().transactions.clone()
+            cat.catalog().transactions.clone(),
+            cat.catalog().next_xid
         );
 
         // Rebuild indexes from catalog metadata
@@ -68,16 +72,9 @@ impl Engine {
                 imeta.table.clone(),
                 imeta.columns.clone(),
             );
-
-            // Populate index by scanning existing rows
+        
             if let Some(table) = db.tables.get(&imeta.table) {
-                let rows: Vec<Row> = table
-                    .heap
-                    .scan_all(&table.columns)
-                    .into_iter()
-                    .map(|(_, _, _, row)| row)
-                    .collect();
-                for (pos, row) in rows.into_iter().enumerate() {
+                for (page_no, slot_no, _hdr, row) in table.heap.scan_all(&table.columns) {
                     let mut key = Vec::new();
                     for col in &imeta.columns {
                         let col_idx = table
@@ -87,10 +84,10 @@ impl Engine {
                             .expect("Index column not found in table");
                         key.push(row.values[col_idx].clone());
                     }
-                    idx.insert(key, (0, pos)); // note: page_no is always 0 here
+                    idx.insert(key, (page_no as usize, slot_no));
                 }
             }
-
+        
             db.indexes.insert(iname.clone(), idx);
         }
 
@@ -98,6 +95,9 @@ impl Engine {
             db,
             cat,
             current_xid: None,
+            session_isolation: IsolationLevel::ReadCommitted,
+            tx_isolation: None,
+            repeatable_snapshot: None,
         })
     }
 
@@ -163,11 +163,11 @@ impl Engine {
 
     /// Allocate next transaction ID
     pub fn next_xid(&mut self) -> u32 {
-        let cat = self.cat.catalog_mut();
-        let xid = cat.next_xid;
-        cat.next_xid += 1;
+        let xid = self.db.transaction_manager.alloc_xid();
+        self.cat.catalog_mut().next_xid = self.db.transaction_manager.next_xid;
         xid
     }
+    
 
     /// Start a new transaction
     pub fn begin_tx(&mut self, xid: u32) {

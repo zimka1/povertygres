@@ -3,7 +3,7 @@ use crate::executer::join::{JoinTable, JoinTableColumn};
 use crate::types::filter_types::CmpOp;
 use crate::types::parser_types::{Condition, Operand};
 use crate::types::storage_types::{Column, Database, Row, Table, Value};
-use crate::types::transaction_types::TransactionManager;
+use crate::types::transaction_types::{Snapshot, TransactionManager};
 use std::ops::Bound;
 
 /// Argument to SELECT: either a table name or a prebuilt JoinTable
@@ -13,7 +13,13 @@ pub enum TableArg {
 }
 
 /// Convert physical table into JoinTable with alias
-fn phys_to_join(tm: &TransactionManager, table: &Table, alias: &str, xid: u32) -> JoinTable {
+fn phys_to_join(
+    tm: &TransactionManager,
+    table: &Table,
+    alias: &str,
+    xid: u32,
+    snapshot: &Snapshot,
+) -> JoinTable {
     let cols = table
         .columns
         .iter()
@@ -27,15 +33,13 @@ fn phys_to_join(tm: &TransactionManager, table: &Table, alias: &str, xid: u32) -
         .heap
         .scan_all(&table.columns)
         .into_iter()
-        .filter(|(_, _, header, _)| header.is_visible(xid, tm))
+        .filter(|(_, _, header, _)| header.is_visible(xid, snapshot, tm))
         .map(|(_, _, _, row)| row)
         .collect();
 
-    JoinTable {
-        columns: cols,
-        rows,
-    }
+    JoinTable { columns: cols, rows }
 }
+
 
 /// Find index of column in metadata by name or alias.col
 fn find_idx(meta: &[JoinTableColumn], name: &str) -> Result<usize, String> {
@@ -115,11 +119,12 @@ impl Database {
         table: &Table,
         filter: &Option<Condition>,
         xid: u32,
+        snapshot: &Snapshot,
     ) -> Result<Option<Vec<Row>>, String> {
         // Case 1: equality conditions
         if let Some(cols_vals) = filter.as_ref().and_then(|c| extract_eq_conditions(c)) {
             let filter_cols: Vec<String> = cols_vals.iter().map(|(c, _)| c.clone()).collect();
-
+    
             for idx in self.indexes.values() {
                 if idx.table == table.name && idx.columns == filter_cols {
                     let key: Vec<Value> = cols_vals.iter().map(|(_, v)| v.clone()).collect();
@@ -127,11 +132,9 @@ impl Database {
                         let mut rows = Vec::new();
                         for (page_no, slot_no) in positions {
                             if let Some((header, row)) =
-                                table
-                                    .heap
-                                    .get_tuple(*page_no as u32, *slot_no, &table.columns)
+                                table.heap.get_tuple(*page_no as u32, *slot_no, &table.columns)
                             {
-                                if header.is_visible(xid, &self.transaction_manager) {
+                                if header.is_visible(xid, snapshot, &self.transaction_manager) {
                                     rows.push(row);
                                 }
                             }
@@ -141,31 +144,29 @@ impl Database {
                 }
             }
         }
-
+    
         // Case 2: range condition
-        if let Some((col, lower, upper)) = filter.as_ref().and_then(|c| extract_range_condition(c))
-        {
+        if let Some((col, lower, upper)) = filter.as_ref().and_then(|c| extract_range_condition(c)) {
             for idx in self.indexes.values() {
                 if idx.table == table.name && idx.columns.len() == 1 && idx.columns[0] == col {
                     let positions = idx.search_range(lower, upper);
                     let mut rows = Vec::new();
                     for (page_no, slot_no) in positions {
-                        if let Some((_, row)) =
-                            table
-                                .heap
-                                .get_tuple(page_no as u32, slot_no, &table.columns)
+                        if let Some((header, row)) =
+                            table.heap.get_tuple(page_no as u32, slot_no, &table.columns)
                         {
-                            rows.push(row);
+                            if header.is_visible(xid, snapshot, &self.transaction_manager) {
+                                rows.push(row);
+                            }
                         }
                     }
                     return Ok(Some(rows));
                 }
             }
         }
-
-        // No suitable index found
+    
         Ok(None)
-    }
+    }    
 
     /// Execute SELECT on a single table or join
     pub fn select(
@@ -174,6 +175,7 @@ impl Database {
         column_names: &Vec<String>,
         filter: Option<Condition>,
         xid: u32,
+        snapshot: &Snapshot,
     ) -> Result<(Vec<JoinTableColumn>, Vec<Row>), String> {
         // 1) Normalize input into JoinTable
         let exec: JoinTable = match table_arg {
@@ -183,7 +185,7 @@ impl Database {
                     .tables
                     .get(name)
                     .ok_or_else(|| format!("Table '{}' doesn't exist", name))?;
-                if let Some(rows) = self.try_index_lookup(t, &filter, xid)? {
+                if let Some(rows) = self.try_index_lookup(t, &filter, xid, snapshot)? {
                     JoinTable {
                         columns: t
                             .columns
@@ -197,7 +199,7 @@ impl Database {
                     }
                 } else {
                     // For plain table, use its name as alias
-                    phys_to_join(&self.transaction_manager, t, name, xid)
+                    phys_to_join(&self.transaction_manager, t, name, xid, snapshot)
                 }
             }
         };

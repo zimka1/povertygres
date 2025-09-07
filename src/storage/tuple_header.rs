@@ -1,23 +1,48 @@
 use crate::types::{
     page_types::{NullBitmap, TupleHeader},
-    transaction_types::{TransactionManager, TxStatus},
+    transaction_types::{Snapshot, TransactionManager, TxStatus},
 };
 use std::convert::TryInto;
 
 impl TupleHeader {
-    pub fn is_visible(&self, cur_xid: u32, tm: &TransactionManager) -> bool {
-        match tm.status(self.xmin) {
-            TxStatus::Committed => match self.xmax {
-                None => true,
-                Some(x) => match tm.status(x) {
-                    TxStatus::InProgress => x == cur_xid,
-                    TxStatus::Committed => false,
-                    TxStatus::Aborted => true,
-                },
-            },
-            TxStatus::InProgress => self.xmin == cur_xid,
-            TxStatus::Aborted => false,
-        }
+    pub fn is_visible(&self, cur_xid: u32, snapshot: &Snapshot, tm: &TransactionManager) -> bool {
+        let xmin_result = if self.xmin == cur_xid {
+            true
+        } else {
+            if snapshot.active_xids.contains(&self.xmin) {
+                return false;
+            }
+            if self.xmin >= snapshot.xmax {
+                return false;
+            }
+            match tm.status(self.xmin) {
+                TxStatus::Aborted => false,
+                TxStatus::InProgress => false,
+                TxStatus::Committed => true
+            }
+        };
+
+        let xmax_result = if let Some(xmax) = self.xmax {
+            if xmax == cur_xid {
+                return false;
+            }
+            if snapshot.active_xids.contains(&xmax) {
+                return true;
+            }
+            if xmax >= snapshot.xmax {
+                return true;
+            }
+            match tm.status(xmax) {
+                TxStatus::Aborted => true,
+                TxStatus::InProgress => true,
+                TxStatus::Committed => false
+            }
+        } else {
+            true
+        };
+
+        xmin_result && xmax_result
+
     }
 
     pub fn is_dead(&self, tm: &TransactionManager) -> bool {
@@ -54,7 +79,7 @@ impl TupleHeader {
         buf
     }
 
-    pub fn from_bytes(buf: &[u8], column_count: usize) -> Self {
+    pub fn from_bytes(buf: &[u8]) -> Self {
         // read xmin
         let xmin = u32::from_le_bytes(buf[0..4].try_into().unwrap());
 
@@ -73,7 +98,6 @@ impl TupleHeader {
         // construct nullmap
         let nullmap = NullBitmap {
             bytes: null_bytes,
-            column_count,
         };
 
         Self {
@@ -91,7 +115,6 @@ impl NullBitmap {
         let byte_count = (column_count + 7) / 8;
         Self {
             bytes: vec![0; byte_count],
-            column_count,
         }
     }
 

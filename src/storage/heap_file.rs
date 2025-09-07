@@ -1,5 +1,5 @@
 use crate::consts::catalog_consts::PAGE_SIZE;
-use crate::consts::page_consts::ITEM_ID_SIZE;
+use crate::consts::page_consts::{ITEM_ID_SIZE, PAGE_HEADER_SIZE};
 use crate::executer::help_functions::build_key;
 use crate::types::b_tree::BTreeIndex;
 use crate::types::page_types::{ItemId, Page, TupleHeader};
@@ -136,7 +136,6 @@ impl HeapFile {
         page_no: u32,
         slot_no: usize,
         xid: u32,
-        columns: &[Column],
     ) -> Result<(), String> {
         let mut page = self.read_page(page_no);
         if slot_no as u16 >= page.header.slot_count {
@@ -151,16 +150,16 @@ impl HeapFile {
             return Err("Slot already unused".into());
         }
     
-        // slice out tuple bytes
-        let tuple_bytes = &mut page.data[item.offset as usize..(item.offset + item.len) as usize];
+        const XMAX_OFFSET: usize = 4;
+        let tuple_range_lo = item.offset as usize;
+        let tuple_range_hi = (item.offset + item.len) as usize;
+        let tuple_bytes = &mut page.data[tuple_range_lo..tuple_range_hi];
     
-        // read header
-        let mut header = TupleHeader::from_bytes(tuple_bytes, columns.len());
-        header.xmax = Some(xid);
+        if tuple_bytes.len() < XMAX_OFFSET + 4 {
+            return Err("Corrupted tuple header: too short to hold xmax".into());
+        }
     
-        // overwrite header bytes
-        let header_bytes = header.to_bytes();
-        tuple_bytes[..header_bytes.len()].copy_from_slice(&header_bytes);
+        tuple_bytes[XMAX_OFFSET..XMAX_OFFSET + 4].copy_from_slice(&xid.to_le_bytes());
     
         self.write_page(&page);
         Ok(())
@@ -174,23 +173,21 @@ impl HeapFile {
         slot_no: usize,
         new_row: Row,
         xid: u32,
-        columns: &[Column],
-    ) -> Result<(), String> {
+    ) -> Result<(u32, usize), String> {
         // mark old tuple as deleted for this xid
-        self.delete_at(page_no, slot_no, xid, columns)?;
+        self.delete_at(page_no, slot_no, xid)?;
     
         // insert new tuple with xmin = xid
         let mut page: Page = self.read_page(page_no);
-        if page.insert_tuple(new_row.clone(), xid).is_ok() {
+        if let Ok(new_slot) = page.insert_tuple(new_row.clone(), xid) {
             self.write_page(&page);
-            Ok(())
+            return Ok((page_no, new_slot));
         } else {
             let mut new_page = self.append_page();
-            new_page
-                .insert_tuple(new_row, xid)
-                .map_err(|e| e.to_string())?;
+            let new_slot = new_page.insert_tuple(new_row, xid).map_err(|e| e.to_string())?;
+            let new_page_no = new_page.header.page_no;
             self.write_page(&new_page);
-            Ok(())
+            return Ok((new_page_no, new_slot));
         }
     }
     
@@ -207,36 +204,49 @@ impl HeapFile {
         let page_count = (metadata.len() / PAGE_SIZE as u64) as u32;
     
         for page_no in 0..page_count {
-            let page = self.read_page(page_no);
-            let mut new_page = Page::new(page_no);
+            let mut page = self.read_page(page_no);
     
-            for slot_no in 0..page.header.slot_count {
-                let slot_offset: usize =
-                    PAGE_SIZE as usize - (slot_no + 1) as usize * ITEM_ID_SIZE;
-                let item =
-                    ItemId::from_bytes(&page.data[slot_offset..slot_offset + ITEM_ID_SIZE]);
-                if !item.is_used() {
-                    continue;
-                }
+            let mut write_ptr: usize = PAGE_HEADER_SIZE as usize;
     
-                if let Some((header, row)) = page.get_tuple(slot_no as usize, columns) {
+            for slot_no in 0..page.header.slot_count as usize {
+                let slot_off = PAGE_SIZE as usize - (slot_no + 1) * ITEM_ID_SIZE;
+                let mut item = ItemId::from_bytes(&page.data[slot_off..slot_off + ITEM_ID_SIZE]);
+    
+                if !item.is_used() { continue; }
+    
+                if let Some((header, row)) = page.get_tuple(slot_no, columns) {
                     if header.is_dead(tm) {
                         for idx in indexes.values_mut().filter(|i| i.table == table_name) {
                             let key = build_key(&idx.columns, columns, &row.values, table_name)
                                 .expect("failed to build key");
-                            idx.remove(&key, (page_no as usize, slot_no as usize));
-                        }                        
+                            idx.remove(&key, (page_no as usize, slot_no));
+                        }
+                        item.mark_unused();
+                        page.data[slot_off..slot_off + ITEM_ID_SIZE]
+                            .copy_from_slice(&item.to_bytes());
                         removed += 1;
-                    } else {
-                        new_page
-                            .insert_tuple(row.clone(), header.xmin)
-                            .expect("failed to insert tuple during compaction");
+                        continue;
                     }
+    
+                    let src_lo = item.offset as usize;
+                    let src_hi = src_lo + item.len as usize;
+                    let len = item.len as usize;
+    
+                    if write_ptr != src_lo {
+                        let tmp = page.data[src_lo..src_hi].to_vec();
+                        page.data[write_ptr..write_ptr + len].copy_from_slice(&tmp);
+                    }
+    
+                    item.offset = write_ptr as u16;
+                    item.len = len as u16;
+                    page.data[slot_off..slot_off + ITEM_ID_SIZE]
+                        .copy_from_slice(&item.to_bytes());
+    
+                    write_ptr += len;
                 }
             }
-    
-            // теперь пишем перепакованную страницу
-            self.write_page(&new_page);
+            page.header.free_start = write_ptr as u16;
+            self.write_page(&page);
         }
     
         removed

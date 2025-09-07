@@ -2,6 +2,7 @@ use crate::executer::help_functions::validate_foreign_keys;
 use crate::types::page_types::TupleHeader;
 use crate::types::storage_types::Database;
 use crate::types::storage_types::{ColumnType, Row, Value};
+use crate::types::transaction_types::Snapshot;
 
 impl Database {
     // Inserts a new row into a table
@@ -11,6 +12,7 @@ impl Database {
         column_names: Option<Vec<String>>, // Optional: user can specify columns
         values: Vec<Value>,                // Values to insert
         xid: u32,
+        snapshot: &Snapshot
     ) -> Result<(), String> {
         // Get the target table (immutable for now)
         let table = self
@@ -110,7 +112,7 @@ impl Database {
                 .map(|(_, _, header, row)| (row, header))
                 .collect();
             for (row, header) in existing_rows {
-                if header.is_visible(xid, &self.transaction_manager) {
+                if header.is_visible(xid, snapshot, &self.transaction_manager) {
                     if row.values[pk_idx] == *pk_val {
                         return Err(format!(
                             "duplicate key value violates primary key constraint on '{}'",

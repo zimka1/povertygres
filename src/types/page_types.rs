@@ -33,5 +33,4 @@ pub struct TupleHeader {
 #[derive(Debug, Clone)]
 pub struct NullBitmap {
     pub bytes: Vec<u8>,      // raw bitmap bytes
-    pub column_count: usize, // number of columns tracked
 }

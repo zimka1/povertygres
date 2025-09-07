@@ -100,3 +100,23 @@ rollback;
 vacuum users;
 select * from users;
 
+begin isolation level read committed;
+insert into users values (8, "RC_User", true);
+select * from users where id = 8;
+commit;
+
+begin isolation level repeatable read;
+select * from users;
+insert into users values (9, "RR_User", true);
+select * from users where id = 9;
+commit;
+
+select * from users;
+
+set session characteristics as transaction isolation level repeatable read;
+begin;
+select * from users;
+insert into users values (10, "SessUser", true);
+select * from users where id = 10;
+commit;
+select * from users;

@@ -4,6 +4,7 @@ use crate::executer::join::JoinTableColumn;
 use crate::types::parser_types::Condition;
 use crate::types::storage_types::{Column, Database};
 use crate::types::storage_types::{ColumnType, Value};
+use crate::types::transaction_types::Snapshot;
 use std::collections::HashMap;
 
 /// Build column metadata for a single table
@@ -41,6 +42,7 @@ impl Database {
         parsed_values: Vec<Value>,
         filter: Option<Condition>,
         xid: u32,
+        snapshot: &Snapshot,
     ) -> Result<(), String> {
         // Find the table (immutable reference only, rows will be updated later)
         let table = self
@@ -111,7 +113,7 @@ impl Database {
 
         // Walk rows and apply updates
         for (page_no, slot_no, header, mut row) in table.heap.scan_all(&table.columns).into_iter() {
-            if !header.is_visible(xid, &self.transaction_manager) {
+            if !header.is_visible(xid, snapshot, &self.transaction_manager) {
                 continue;
             }
             if let Some(cond) = &filter {
@@ -123,7 +125,8 @@ impl Database {
                 }
             }
 
-            let original_row = row.values.clone();
+            let old_row_vals = row.values.clone();
+            let old_pos = (page_no as usize, slot_no);
 
             // Write new values into row
             for (idx, val) in &targets {
@@ -133,21 +136,19 @@ impl Database {
             // Foreign key validation for updated row
             validate_foreign_keys(self, table, &row.values)?;
 
-            for idx in self.indexes.values_mut() {
-                if idx.table == table.name {
-                    let old_key =
-                        build_key(&idx.columns, &table.columns, &original_row, &table.name)?;
-                    let new_key =
-                        build_key(&idx.columns, &table.columns, &row.values, &table.name)?;
-                    if old_key != new_key {
-                        idx.remove(&old_key, (page_no as usize, slot_no));
-                        idx.insert(new_key, (page_no as usize, slot_no));
-                    }
-                }
+            // If all checks pass, write updated row back to storage
+            let (new_page_no, new_slot_no) =
+            table.heap.update_row(page_no, slot_no, row.clone(), xid)?;
+
+            for idx in self.indexes.values_mut().filter(|i| i.table == table.name) {
+                let old_key = build_key(&idx.columns, &table.columns, &old_row_vals, &table.name)?;
+                let new_key = build_key(&idx.columns, &table.columns, &row.values, &table.name)?;
+
+                idx.insert(new_key, (new_page_no as usize, new_slot_no));
+
+                idx.remove(&old_key, old_pos);
             }
 
-            // If all checks pass, write updated row back to storage
-            table.heap.update_row(page_no, slot_no, row, xid, &table.columns)?;
         }
 
         Ok(())

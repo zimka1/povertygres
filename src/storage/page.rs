@@ -99,7 +99,8 @@ impl Page {
         }
 
         // find item id in slot array
-        let slot_offset = PAGE_SIZE - (slot_no + 1) * ITEM_ID_SIZE;
+        let slot_offset = self.header.free_end as usize + slot_no * ITEM_ID_SIZE;
+        if slot_offset + ITEM_ID_SIZE > PAGE_SIZE { return None; }
         let item_bytes = &self.data[slot_offset..slot_offset + ITEM_ID_SIZE];
         let item = ItemId::from_bytes(item_bytes);
 
@@ -127,7 +128,6 @@ impl Page {
         // construct null bitmap
         let nullmap = NullBitmap {
             bytes: nullmap_bytes,
-            column_count: columns.len(),
         };
 
         // parse values

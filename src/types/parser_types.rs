@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 
-use crate::types::{filter_types::CmpOp, storage_types::ForeignKeyConstraint};
+use crate::types::{filter_types::CmpOp, storage_types::ForeignKeyConstraint, transaction_types::IsolationLevel};
 
 use super::storage_types::{Column, Value};
 
 /// Abstract Syntax Tree (AST) for parsed SQL-like queries
 #[derive(Debug)]
 pub enum Query {
-    Begin,
+    Begin { isolation: Option<IsolationLevel> },
     Commit,
     Rollback,
+    SetSessionIsolationLevel(IsolationLevel),
     Vacuum {
         table_name: String,
     },

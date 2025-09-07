@@ -27,6 +27,7 @@ fn main() {
             if stmt.is_empty() {
                 continue;
             }
+            println!("{}", stmt);
             match parse_query(stmt) {
                 Ok(ast) => {
                     if let Err(err) = execute(&mut engine, ast) {

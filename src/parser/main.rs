@@ -3,7 +3,7 @@ use super::{
 };
 use crate::{
     parser::{
-        delete::parse_delete, index::parse_create_index, update::parse_update, vacuum::parse_vacuum,
+        begin::parse_begin, delete::parse_delete, index::parse_create_index, set_isolation::parse_set_session, update::parse_update, vacuum::parse_vacuum
     },
     types::parser_types::{Condition, Query},
 };
@@ -37,14 +37,16 @@ pub fn parse_query(input: &str) -> Result<Query, String> {
         parse_delete(input, condition)
     } else if lower.starts_with("update ") {
         parse_update(input, condition)
-    } else if lower == "begin" {
-        Ok(Query::Begin)
+    } else if lower.starts_with("begin") {
+        parse_begin(input)
     } else if lower == "commit" {
         Ok(Query::Commit)
     } else if lower == "rollback" {
         Ok(Query::Rollback)
     } else if lower.starts_with("vacuum ") {
         parse_vacuum(input)
+    } else if lower.starts_with("set session characteristics") {
+        parse_set_session(input)
     } else {
         Err("Unrecognized command".to_string())
     }
