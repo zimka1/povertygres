@@ -101,8 +101,6 @@ Goal: implement core PostgreSQL architecture and algorithms.
 ## Storage Engine
 * [ ] Storage trait (`Storage` abstraction over in-memory / heap files)
 * [ ] Better row identifier (`RID { page_no, slot_no }`)
-* [ ] Free space management (detect full page, append new one)
-* [ ] Basic VACUUM (reuse dead slots instead of always appending pages)
 
 ---
 
@@ -115,8 +113,6 @@ Goal: implement core PostgreSQL architecture and algorithms.
 ---
 
 ## Concurrency & Transactions
-- [ ] MVCC (multi-version concurrency control)
-- [ ] Snapshot isolation
 - [ ] Simple locks
 - [ ] WAL (write-ahead logging)
 
